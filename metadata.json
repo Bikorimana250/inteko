@@ -1,0 +1,6 @@
+{
+  "name": "Inteko y'Abaturage Management System",
+  "description": "A government administration platform designed to digitize the planning, management, monitoring, and reporting of citizen assembly meetings conducted at sector, cell, and village levels.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

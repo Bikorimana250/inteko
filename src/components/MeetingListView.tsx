@@ -1,0 +1,341 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState } from 'react';
+import { 
+  Calendar, MapPin, Search, Plus, Filter, Play, 
+  Check, Archive, AlertCircle, RefreshCw, X, ChevronRight, SlidersHorizontal 
+} from 'lucide-react';
+import { Meeting } from '../types';
+
+interface MeetingListViewProps {
+  meetings: Meeting[];
+  onAddSimulatedMeeting: (meetingData: Omit<Meeting, 'id' | 'participants'>) => void;
+  onUpdateMeetingStatus: (meetingId: string, status: 'Scheduled' | 'Ongoing' | 'Completed' | 'Postponed') => void;
+}
+
+export const MeetingListView: React.FC<MeetingListViewProps> = ({
+  meetings,
+  onAddSimulatedMeeting,
+  onUpdateMeetingStatus
+}) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('All');
+  const [showScheduleForm, setShowScheduleForm] = useState(false);
+
+  // Form states
+  const [title, setTitle] = useState('');
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
+  const [location, setLocation] = useState('');
+  const [targetCount, setTargetCount] = useState(100);
+  const [sector, setSector] = useState('Gasabo Sector');
+  const [errorCode, setErrorCode] = useState('');
+
+  const filteredMeetings = meetings.filter((m) => {
+    const matchesSearch = m.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          m.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'All' ? true : m.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title || !date || !location) {
+      setErrorCode('Missing critical credentials. Title, Date and Location required.');
+      return;
+    }
+    
+    onAddSimulatedMeeting({
+      title: title.toUpperCase(),
+      date,
+      time: time || '09:00 AM CAT',
+      location,
+      targetCount: Number(targetCount),
+      status: 'Scheduled',
+      sector
+    });
+
+    // Reset fields
+    setTitle('');
+    setDate('');
+    setTime('');
+    setLocation('');
+    setTargetCount(100);
+    setErrorCode('');
+    setShowScheduleForm(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      
+      {/* 1. Header showing controls */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-[#1a42310d]">
+        <div className="space-y-0.5">
+          <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Citizen Assembly Calendars (Inteko y'Abaturage)</h2>
+          <p className="text-[10px] text-slate-400 font-medium">Schedule, modify, and monitor active council assemblies.</p>
+        </div>
+
+        <button
+          onClick={() => setShowScheduleForm(!showScheduleForm)}
+          className="py-1.5 px-3 bg-[#1a4231] text-white hover:bg-slate-800 text-[11px] font-bold rounded-sm tracking-wide uppercase cursor-pointer flex items-center gap-1 shadow-sm"
+        >
+          {showScheduleForm ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+          <span>{showScheduleForm ? 'Exit Schedule Forms' : 'Schedule Assembly'}</span>
+        </button>
+      </div>
+
+      {/* 2. Schedule meeting slider form drawer */}
+      {showScheduleForm && (
+        <div className="bg-white p-5 rounded-sm border border-[#1a423126] hover:shadow-md transition-all max-w-2xl mx-auto space-y-4">
+          <div className="flex justify-between items-start pb-2 border-b border-slate-100">
+            <div>
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-tight">Draft Assembly Registry</h3>
+              <p className="text-[10px] text-slate-400">Initialize a regional citizen assembly request within the local queue.</p>
+            </div>
+            <button onClick={() => setShowScheduleForm(false)} className="text-slate-400 hover:text-slate-600">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {errorCode && (
+            <div className="text-[10px] font-bold text-red-700 bg-red-50 p-2 border-l-[3px] border-red-600 rounded-xs flex items-center gap-2">
+              <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />
+              <span>{errorCode}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4 text-xs select-none">
+            
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Assembly Title</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. UMUGANDA PLANNING ASSEMBLY"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-sm focus:outline-none focus:border-[#1a4231]"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Target Date</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Oct 28, 2023"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-sm focus:outline-none focus:border-[#1a4231]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Target Time</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 09:00 AM CAT"
+                    value={time}
+                    onChange={(e) => setTime(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-sm focus:outline-none focus:border-[#1a4231]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Targeted Civil attendance count</label>
+                  <input
+                    type="number"
+                    value={targetCount}
+                    onChange={(e) => setTargetCount(Number(e.target.value))}
+                    className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-sm focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Sector unit</label>
+                  <input
+                    type="text"
+                    value={sector}
+                    onChange={(e) => setSector(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-sm focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Assembly Location Site</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Kigali City Hall Auditorium"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-sm focus:outline-none focus:border-[#1a4231]"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowScheduleForm(false)}
+                className="px-3 py-1.5 border border-slate-200 hover:bg-slate-100 text-slate-700 text-[10px] font-bold uppercase rounded-sm cursor-pointer"
+              >
+                Cancel Draft
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-1.5 bg-[#1a4231] text-white hover:bg-[#1a2d21] text-[10px] font-bold uppercase rounded-sm transition-colors cursor-pointer"
+              >
+                Publish Assembly
+              </button>
+            </div>
+
+          </form>
+        </div>
+      )}
+
+      {/* 3. Search and filter tools */}
+      <div className="bg-white p-4 rounded-sm border border-[#1a42310d] space-y-4">
+        
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-dashed border-slate-100">
+          
+          <div className="relative flex-1 max-w-sm">
+            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+              <Search className="w-4 h-4" />
+            </span>
+            <input
+              type="text"
+              placeholder="Search assemblies by title, index code or location..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded-sm focus:outline-none focus:border-[#1a4231]"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <SlidersHorizontal className="w-4 h-4 text-slate-400 shrink-0" />
+            
+            {/* Status filters selection */}
+            <div className="flex items-center gap-1 text-xs">
+              <span className="text-[10px] uppercase text-slate-500 font-mono">Status:</span>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="py-1 px-2 border border-slate-200 bg-slate-50/50 rounded-sm text-xs focus:outline-none"
+              >
+                <option value="All">All Assemblies</option>
+                <option value="Scheduled">Scheduled</option>
+                <option value="Ongoing">Ongoing</option>
+                <option value="Completed">Completed</option>
+                <option value="Postponed">Postponed</option>
+              </select>
+            </div>
+          </div>
+
+        </div>
+
+        {/* 4. Calendars listings output */}
+        <div className="space-y-4">
+          {filteredMeetings.length === 0 ? (
+            <div className="py-12 text-center text-xs text-slate-400 font-medium select-none border border-dashed border-slate-100">
+              No planned citizen assemblies matched your active criteria filters.
+            </div>
+          ) : (
+            filteredMeetings.map((meeting) => {
+              const ratio = Math.round((meeting.participants / (meeting.targetCount || 1)) * 100);
+
+              return (
+                <div 
+                  key={meeting.id}
+                  className="p-4 border border-slate-100 hover:border-[#1a423126] hover:shadow-xs transition-all bg-slate-50/25 hover:bg-slate-50 rounded-sm flex flex-col md:flex-row md:items-center justify-between gap-4"
+                >
+                  <div className="space-y-2 flex-1">
+                    
+                    {/* Status header */}
+                    <div className="flex gap-2 items-center flex-wrap">
+                      <span className={`px-2 py-0.5 rounded-sm text-[8px] font-bold tracking-wider uppercase border ${
+                        meeting.status === 'Ongoing' ? 'bg-emerald-50 text-emerald-800 border-emerald-100' :
+                        meeting.status === 'Scheduled' ? 'bg-indigo-50 text-indigo-805 border-indigo-100' :
+                        meeting.status === 'Completed' ? 'bg-slate-100 text-slate-600 border-slate-200' :
+                        'bg-red-50 text-red-800 border-red-100'
+                      }`}>
+                        {meeting.status}
+                      </span>
+                      
+                      <span className="text-[9px] text-slate-400 font-mono font-bold uppercase">System ID: {meeting.id}</span>
+                      <span className="text-[9px] text-slate-400">•</span>
+                      <span className="text-[9px] text-[#1a4231] font-bold uppercase">{meeting.sector}</span>
+                    </div>
+
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-800 tracking-tight leading-snug">{meeting.title}</h4>
+                      <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-1 font-light">
+                        <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span>Site Site: <strong>{meeting.location}</strong></span>
+                      </p>
+                    </div>
+
+                  </div>
+
+                  {/* Targets bar */}
+                  <div className="md:w-48 space-y-1 shrink-0">
+                    <span className="text-[9px] text-slate-400 uppercase tracking-wider font-bold block">Target progress</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-24 bg-[#1a42310c] h-1.5 rounded-xs overflow-hidden shrink-0">
+                        <div className="bg-[#1a4231] h-full" style={{ width: `${ratio}%` }}></div>
+                      </div>
+                      <span className="text-[11px] font-bold font-mono text-slate-600">{meeting.participants}/{meeting.targetCount} ({ratio}%)</span>
+                    </div>
+                    <span className="text-[8px] font-mono font-bold text-slate-400 block tracking-tight">{meeting.date} at {meeting.time}</span>
+                  </div>
+
+                  {/* Actions switcher */}
+                  <div className="flex items-center justify-end gap-1 shrink-0 pt-2 md:pt-0 border-t border-slate-100 md:border-none">
+                    {meeting.status !== 'Ongoing' && meeting.status !== 'Completed' && (
+                      <button
+                        onClick={() => onUpdateMeetingStatus(meeting.id, 'Ongoing')}
+                        className="py-1 px-2 bg-white border border-[#10b98133] hover:bg-emerald-50 text-emerald-800 text-[10px] font-bold uppercase rounded-sm cursor-pointer transition-colors"
+                        title="Commence active assembly citizen check-in"
+                      >
+                        Activate Check-in
+                      </button>
+                    )}
+
+                    {meeting.status === 'Ongoing' && (
+                      <button
+                        onClick={() => onUpdateMeetingStatus(meeting.id, 'Completed')}
+                        className="py-1 px-2 bg-[#1a4231] text-white hover:bg-slate-800 text-[10px] font-bold uppercase rounded-sm cursor-pointer transition-colors"
+                        title="Audit citizen list and archive file"
+                      >
+                        Archive Complete
+                      </button>
+                    )}
+
+                    {meeting.status !== 'Postponed' && meeting.status !== 'Completed' && (
+                      <button
+                        onClick={() => onUpdateMeetingStatus(meeting.id, 'Postponed')}
+                        className="py-1 px-2.5 bg-white border border-slate-200 hover:bg-red-50 text-slate-500 hover:text-red-800 text-[10px] font-semibold uppercase rounded-sm cursor-pointer"
+                        title="Postpone assembly file"
+                      >
+                        Postpone
+                      </button>
+                    )}
+                  </div>
+
+                </div>
+              );
+            })
+          )}
+        </div>
+
+      </div>
+
+    </div>
+  );
+};
