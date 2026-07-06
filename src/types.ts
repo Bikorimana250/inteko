@@ -24,6 +24,7 @@ export interface User {
 
 export interface Meeting {
   id: string; // e.g., "#MTG-2023-089"
+  dbId?: number; // numeric DB primary key, populated when loaded from backend
   title: string;
   date: string;
   time: string;

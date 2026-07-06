@@ -16,6 +16,7 @@ import {
   INITIAL_USERS, INITIAL_MEETINGS, INITIAL_CELLS, 
   INITIAL_NOTIFICATIONS, INITIAL_ISSUES, AVATARS 
 } from './data';
+import { fetchMeetings } from './api';
 
 // import sub-views
 import { LoginView } from './components/LoginView';
@@ -168,6 +169,29 @@ export default function App() {
     localStorage.setItem('inteko_resolutions_registry', JSON.stringify(resolutions));
   }, [resolutions]);
 
+  // Load meetings from backend on mount; fall back to localStorage if backend is unavailable
+  useEffect(() => {
+    fetchMeetings()
+      .then((backendMeetings) => {
+        const mapped: Meeting[] = backendMeetings.map((m) => ({
+          id: m.meetingCode ? `#${m.meetingCode}` : `#MTG-${m.id}`,
+          dbId: m.id,
+          title: m.title,
+          date: m.meetingDate,
+          time: m.meetingTime,
+          location: m.location,
+          status: (m.status as Meeting['status']) || 'Scheduled',
+          participants: m.participantsCount ?? 0,
+          targetCount: m.targetCount,
+          sector: m.sectorName ?? '',
+        }));
+        setMeetings(mapped);
+      })
+      .catch(() => {
+        // Backend not reachable — keep localStorage data
+      });
+  }, []);
+
   // Auth controllers
   const handleLogin = (userMatched: Partial<User>) => {
     setCurrentUser(userMatched);
@@ -186,6 +210,7 @@ export default function App() {
     setShowProfileDropdown(false);
     localStorage.removeItem('inteko_auth_state');
     localStorage.removeItem('inteko_current_user');
+    localStorage.removeItem('inteko_jwt_token');
   };
 
   // Direct user modifications
@@ -286,15 +311,8 @@ export default function App() {
     setNotifications(prev => [newNotif, ...prev]);
   };
 
-  const handleAddSimulatedMeeting = (meetingData: Omit<Meeting, 'id' | 'participants'>) => {
-    const nextId = `#MTG-2023-0${meetings.length + 90}`;
-    const newMtg: Meeting = {
-      ...meetingData,
-      id: nextId,
-      participants: 0
-    };
+  const handleMeetingCreated = (newMtg: Meeting) => {
     setMeetings(prev => [newMtg, ...prev]);
-    alert(`Committed new community assembly: '${newMtg.title}' successfully.`);
   };
 
   const handleUpdateMeetingStatus = (meetingId: string, status: 'Scheduled' | 'Ongoing' | 'Completed' | 'Postponed') => {
@@ -523,7 +541,7 @@ export default function App() {
         return (
           <MeetingListView
             meetings={searchedMeetings}
-            onAddSimulatedMeeting={handleAddSimulatedMeeting}
+            onMeetingCreated={handleMeetingCreated}
             onUpdateMeetingStatus={handleUpdateMeetingStatus}
             onCheckInAttendee={(meetingId, attendee) => {
               setMeetings(prev => prev.map(m =>
@@ -534,11 +552,7 @@ export default function App() {
         );
 
       case 'Attendance Summary':
-        return (
-          <AttendanceSummaryView
-            meetings={meetings}
-          />
-        );
+        return <AttendanceSummaryView />;
 
       case 'Notifications':
         const searchedNotifs = query

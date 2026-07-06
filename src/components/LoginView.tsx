@@ -4,13 +4,15 @@
  */
 
 import React, { useState } from 'react';
-import { Shield, Lock, Mail, ChevronRight, Eye, EyeOff } from 'lucide-react';
-import { User, UserRole } from '../types';
+import { Shield, Lock, Mail, ChevronRight, Eye, EyeOff, Loader } from 'lucide-react';
+import { User } from '../types';
 
 interface LoginViewProps {
   onLoginSuccess: (user: Partial<User>) => void;
   availableUsers: User[];
 }
+
+const API_BASE = 'http://localhost:8080/api/v1';
 
 export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, availableUsers }) => {
   const [email, setEmail] = useState('');
@@ -18,43 +20,116 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, availableU
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
       setError('Please enter your official email address.');
       return;
     }
-    // Attempt standard lookup
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        const data = json.data;
+        // Store JWT for subsequent API calls
+        localStorage.setItem('inteko_jwt_token', data.accessToken);
+        // Map backend user to frontend User shape
+        const backendUser = data.user;
+        const roleMap: Record<string, string> = {
+          ADMINISTRATOR: 'Administrator',
+          SECTOR_OFFICIAL: 'Sector Official',
+          MEETING_SECRETARY: 'Meeting Secretary',
+        };
+        const mappedUser: Partial<User> = {
+          id: String(backendUser.id),
+          name: backendUser.name ?? backendUser.fullName ?? email,
+          email: backendUser.email,
+          role: (roleMap[backendUser.role] ?? backendUser.role) as User['role'],
+          status: 'Active',
+          sector: backendUser.sectorName ?? '',
+          cell: backendUser.cellName ?? '',
+          village: backendUser.villageName ?? '',
+          avatar: backendUser.avatar ?? '',
+          position: backendUser.position ?? '',
+        };
+        onLoginSuccess(mappedUser);
+        return;
+      } else if (res.status === 401) {
+        setError('Invalid email or password.');
+        return;
+      }
+      // Non-401 error — fall through to local fallback
+    } catch {
+      // Backend unreachable — fall through to local login
+    } finally {
+      setLoading(false);
+    }
+
+    // Local fallback (dev / backend down)
     const userMatched = availableUsers.find(
       u => u.email.toLowerCase() === email.trim().toLowerCase()
     );
-
     if (userMatched) {
       onLoginSuccess(userMatched);
     } else {
-      // Simulate login for arbitrary email if typed
-      onLoginSuccess({
-        id: 'U-999',
-        name: email.split('@')[0].split('.').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' '),
-        email: email,
-        role: 'Sector Official',
-        status: 'Active',
-        sector: 'Gasabo',
-        cell: 'Kacyiru',
-        village: 'Amahoro',
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-        idNumber: '1199080012345678',
-        phone: '+250 788 000 000',
-        position: 'Sector Representative',
-        permissions: 'Level 2'
-      });
+      setError('Account not found. Check your email address.');
     }
   };
 
-  const handleQuickLogin = (user: User) => {
+  const handleQuickLogin = async (user: User) => {
     setEmail(user.email);
-    setPassword('••••••••');
+    setPassword('password123');
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email, password: 'password123' }),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        const data = json.data;
+        localStorage.setItem('inteko_jwt_token', data.accessToken);
+        const bu = data.user;
+        const roleMap: Record<string, string> = {
+          ADMINISTRATOR: 'Administrator',
+          SECTOR_OFFICIAL: 'Sector Official',
+          MEETING_SECRETARY: 'Meeting Secretary',
+        };
+        const mappedUser: Partial<User> = {
+          id: String(bu.id),
+          name: bu.name ?? bu.fullName ?? user.name,
+          email: bu.email,
+          role: (roleMap[bu.role] ?? bu.role) as User['role'],
+          status: 'Active',
+          sector: bu.sectorName ?? bu.sector ?? user.sector,
+          cell: bu.cellName ?? bu.cell ?? user.cell,
+          village: bu.villageName ?? bu.village ?? user.village,
+          avatar: user.avatar,
+          position: bu.position ?? user.position,
+        };
+        onLoginSuccess(mappedUser);
+        return;
+      }
+    } catch {
+      // Backend unreachable — fall back to local
+    } finally {
+      setLoading(false);
+    }
+
     onLoginSuccess(user);
   };
 
@@ -189,10 +264,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, availableU
 
               <button
                 type="submit"
-                className="w-full py-2.5 bg-[#1a4231] text-white hover:bg-[#1a2d21] text-xs font-bold rounded-sm tracking-wide transition-colors flex items-center justify-center gap-1.5 border border-[#1a42310d] shadow-sm hover:cursor-pointer uppercase"
+                disabled={loading}
+                className="w-full py-2.5 bg-[#1a4231] text-white hover:bg-[#1a2d21] text-xs font-bold rounded-sm tracking-wide transition-colors flex items-center justify-center gap-1.5 border border-[#1a42310d] shadow-sm hover:cursor-pointer uppercase disabled:opacity-60"
               >
-                <span>Authorize & Authenticate</span>
-                <ChevronRight className="w-4 h-4" />
+                {loading ? <Loader className="w-4 h-4 animate-spin" /> : <ChevronRight className="w-4 h-4" />}
+                <span>{loading ? 'Authenticating...' : 'Authorize & Authenticate'}</span>
               </button>
             </form>
 

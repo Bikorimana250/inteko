@@ -3,12 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  Calendar, MapPin, Search, Plus, Filter, Play, 
-  Check, Archive, AlertCircle, RefreshCw, X, ChevronRight, SlidersHorizontal 
+  MapPin, Search, Plus, 
+  Check, AlertCircle, X, SlidersHorizontal, Loader 
 } from 'lucide-react';
 import { Meeting } from '../types';
+import { checkInParticipant, createMeeting, fetchSectors, SectorItem } from '../api';
 
 interface AttendeeEntry {
   name: string;
@@ -18,14 +19,14 @@ interface AttendeeEntry {
 
 interface MeetingListViewProps {
   meetings: Meeting[];
-  onAddSimulatedMeeting: (meetingData: Omit<Meeting, 'id' | 'participants'>) => void;
+  onMeetingCreated: (meeting: Meeting) => void;
   onUpdateMeetingStatus: (meetingId: string, status: 'Scheduled' | 'Ongoing' | 'Completed' | 'Postponed') => void;
   onCheckInAttendee: (meetingId: string, attendee: AttendeeEntry) => void;
 }
 
 export const MeetingListView: React.FC<MeetingListViewProps> = ({
   meetings,
-  onAddSimulatedMeeting,
+  onMeetingCreated,
   onUpdateMeetingStatus,
   onCheckInAttendee
 }) => {
@@ -50,6 +51,25 @@ export const MeetingListView: React.FC<MeetingListViewProps> = ({
   const [sector, setSector] = useState('Gasabo Sector');
   const [errorCode, setErrorCode] = useState('');
 
+  // Sectors for dropdown
+  const [sectors, setSectors] = useState<SectorItem[]>([]);
+  const [sectorId, setSectorId] = useState<number | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    fetchSectors()
+      .then((data) => {
+        setSectors(data);
+        if (data.length > 0) {
+          setSectorId(data[0].id);
+          setSector(data[0].name);
+        }
+      })
+      .catch(() => {
+        // fallback: no sectors loaded, user can type sector name manually
+      });
+  }, []);
+
   const filteredMeetings = meetings.filter((m) => {
     const matchesSearch = m.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           m.id.toLowerCase().includes(searchTerm.toLowerCase());
@@ -57,37 +77,96 @@ export const MeetingListView: React.FC<MeetingListViewProps> = ({
     return matchesSearch && matchesStatus;
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !date || !location) {
       setErrorCode('Missing critical credentials. Title, Date and Location required.');
       return;
     }
-    
-    onAddSimulatedMeeting({
-      title: title.toUpperCase(),
-      date,
-      time: time || '09:00 AM CAT',
-      location,
-      targetCount: Number(targetCount),
-      status: 'Scheduled',
-      sector
-    });
+    // Only require sectorId if sectors were loaded from backend
+    if (sectors.length > 0 && !sectorId) {
+      setErrorCode('Please select a sector.');
+      return;
+    }
 
-    // Reset fields
-    setTitle('');
-    setDate('');
-    setTime('');
-    setLocation('');
-    setTargetCount(100);
+    // Parse date string to ISO format YYYY-MM-DD
+    const parsedDate = new Date(date);
+    const isoDate = isNaN(parsedDate.getTime())
+      ? date // pass as-is if already in correct format
+      : parsedDate.toISOString().split('T')[0];
+
+    // Parse time to HH:MM:SS
+    const rawTime = time || '09:00';
+    const timeParts = rawTime.replace(/\s*(AM|PM|CAT).*/i, '').trim().split(':');
+    const isoTime = timeParts.length >= 2
+      ? `${timeParts[0].padStart(2, '0')}:${timeParts[1].padStart(2, '0')}:00`
+      : '09:00:00';
+
+    setSubmitting(true);
     setErrorCode('');
-    setShowScheduleForm(false);
+
+    try {
+      const created = await createMeeting({
+        title: title.toUpperCase(),
+        meetingDate: isoDate,
+        meetingTime: isoTime,
+        location,
+        targetCount: Number(targetCount),
+        sectorId: sectorId ?? 1,
+      });
+
+      // Map backend response to frontend Meeting type
+      const newMeeting: Meeting = {
+        id: created.meetingCode ? `#${created.meetingCode}` : `#MTG-${created.id}`,
+        dbId: created.id,
+        title: created.title,
+        date: created.meetingDate,
+        time: created.meetingTime,
+        location: created.location,
+        status: 'Scheduled',
+        participants: created.participantsCount ?? 0,
+        targetCount: created.targetCount,
+        sector: created.sectorName ?? sector,
+      };
+
+      onMeetingCreated(newMeeting);
+
+      // Reset fields
+      setTitle('');
+      setDate('');
+      setTime('');
+      setLocation('');
+      setTargetCount(100);
+      setErrorCode('');
+      setShowScheduleForm(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      setErrorCode(`Failed to save meeting: ${msg}`);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleCheckInSubmit = (e: React.FormEvent) => {
+  const handleCheckInSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!ciName.trim()) { setCiError('Full name is required.'); return; }
     const attendee: AttendeeEntry = { name: ciName.trim(), idNumber: ciId.trim(), phone: ciPhone.trim() };
+
+    // Persist to backend if meeting has a DB id
+    const meeting = meetings.find(m => m.id === checkInMeetingId);
+    if (meeting?.dbId) {
+      try {
+        await checkInParticipant(meeting.dbId, {
+          participantName: attendee.name,
+          idNumber: attendee.idNumber || undefined,
+          phone: attendee.phone || undefined,
+        });
+      } catch (err) {
+        setCiError('Failed to save check-in to server. Please try again.');
+        return;
+      }
+    }
+
     onCheckInAttendee(checkInMeetingId!, attendee);
     setCheckedInList(prev => [attendee, ...prev]);
     setCiName(''); setCiId(''); setCiPhone(''); setCiError('');
@@ -292,12 +371,29 @@ export const MeetingListView: React.FC<MeetingListViewProps> = ({
 
                 <div>
                   <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Sector unit</label>
-                  <input
-                    type="text"
-                    value={sector}
-                    onChange={(e) => setSector(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-sm focus:outline-none"
-                  />
+                  {sectors.length > 0 ? (
+                    <select
+                      value={sectorId ?? ''}
+                      onChange={(e) => {
+                        const id = Number(e.target.value);
+                        setSectorId(id);
+                        const found = sectors.find(s => s.id === id);
+                        if (found) setSector(found.name);
+                      }}
+                      className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-sm focus:outline-none focus:border-[#1a4231]"
+                    >
+                      {sectors.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={sector}
+                      onChange={(e) => setSector(e.target.value)}
+                      className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-sm focus:outline-none"
+                    />
+                  )}
                 </div>
               </div>
 
@@ -324,9 +420,11 @@ export const MeetingListView: React.FC<MeetingListViewProps> = ({
               </button>
               <button
                 type="submit"
-                className="px-4 py-1.5 bg-[#1a4231] text-white hover:bg-[#1a2d21] text-[10px] font-bold uppercase rounded-sm transition-colors cursor-pointer"
+                disabled={submitting}
+                className="px-4 py-1.5 bg-[#1a4231] text-white hover:bg-[#1a2d21] text-[10px] font-bold uppercase rounded-sm transition-colors cursor-pointer disabled:opacity-60 flex items-center gap-1.5"
               >
-                Publish Assembly
+                {submitting && <Loader className="w-3 h-3 animate-spin" />}
+                {submitting ? 'Saving...' : 'Publish Assembly'}
               </button>
             </div>
 

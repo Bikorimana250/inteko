@@ -16,6 +16,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfigurationSource;
 import rw.gov.inteko.backend.security.CustomUserDetailsService;
 import rw.gov.inteko.backend.security.JwtAuthenticationEntryPoint;
 import rw.gov.inteko.backend.security.JwtAuthenticationFilter;
@@ -30,6 +31,7 @@ public class SecurityConfig {
     private final CustomUserDetailsService userDetailsService;
     private final JwtTokenProvider tokenProvider;
     private final JwtAuthenticationEntryPoint authenticationEntryPoint;
+    private final CorsConfigurationSource corsConfigurationSource;
     
     @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter() {
@@ -58,21 +60,26 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                .cors(cors -> cors.configure(http))
+                .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .exceptionHandling(exception -> 
                         exception.authenticationEntryPoint(authenticationEntryPoint))
                 .sessionManagement(session -> 
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // Public endpoints
-                        .requestMatchers("/api/v1/auth/**").permitAll()
-                        .requestMatchers("/api/v1/actuator/**").permitAll()
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/auth/**").permitAll()
+                        .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers("/attendance/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/geography/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/meetings/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/meetings/*/participants").permitAll()
                         
                         // Admin-only endpoints
-                        .requestMatchers(HttpMethod.POST, "/api/v1/users").hasRole("ADMINISTRATOR")
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/users/**").hasRole("ADMINISTRATOR")
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/users/**").hasRole("ADMINISTRATOR")
+                        .requestMatchers(HttpMethod.POST, "/users").hasRole("ADMINISTRATOR")
+                        .requestMatchers(HttpMethod.PUT, "/users/**").hasRole("ADMINISTRATOR")
+                        .requestMatchers(HttpMethod.DELETE, "/users/**").hasRole("ADMINISTRATOR")
                         
                         // All authenticated users
                         .anyRequest().authenticated()

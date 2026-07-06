@@ -3,143 +3,160 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
-import { 
-  Users, CheckCircle, TrendingUp, Download, Search, 
-  HelpCircle, ChevronRight, SlidersHorizontal, ArrowUpRight 
-} from 'lucide-react';
-import { Meeting } from '../types';
+import React, { useState, useEffect } from 'react';
+import { TrendingUp, Search } from 'lucide-react';
+import {
+  fetchAttendanceSummary,
+  AttendanceSummaryData,
+  MeetingAttendanceItem,
+} from '../api';
 
-interface AttendanceSummaryViewProps {
-  meetings: Meeting[];
-}
-
-export const AttendanceSummaryView: React.FC<AttendanceSummaryViewProps> = ({ meetings }) => {
+export const AttendanceSummaryView: React.FC = () => {
+  const [data, setData] = useState<AttendanceSummaryData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [cellFilter, setCellFilter] = useState('All');
 
-  // Filter assemblies realistically for tabular listings
-  const filteredMeetings = meetings.filter((meeting) => {
-    const matchesSearch = meeting.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          meeting.id.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch;
-  });
+  useEffect(() => {
+    fetchAttendanceSummary()
+      .then(setData)
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filteredMeetings: MeetingAttendanceItem[] = (data?.meetingAttendances ?? []).filter(
+    (m) =>
+      m.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      m.meetingId.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-48 text-xs text-slate-400">
+        Loading attendance data…
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-48 text-xs text-red-400">
+        Failed to load: {error}
+      </div>
+    );
+  }
+
+  const topCell = data?.topCellRankings?.[0];
+  const attendanceRate = data?.attendanceRate ?? 0;
 
   return (
     <div className="space-y-6">
-      
-      {/* 1. Statistics grids */}
+
+      {/* 1. Statistics grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        
-        {/* Metric 1 */}
+
+        {/* Total participants */}
         <div className="bg-white p-5 rounded-sm border border-[#1a42310d] space-y-3">
           <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold block">Aggregated Attendees</span>
           <div className="flex items-center justify-between">
-            <h3 className="text-2xl font-black text-slate-800 tracking-tight">24,500 Citizens</h3>
+            <h3 className="text-2xl font-black text-slate-800 tracking-tight">
+              {(data?.totalParticipants ?? 0).toLocaleString()} Citizens
+            </h3>
             <span className="text-[10px] bg-emerald-50 text-emerald-800 font-bold px-1.5 py-0.5 rounded-sm flex items-center gap-0.5">
-              +5% <TrendingUp className="w-2.5 h-2.5" />
+              Live <TrendingUp className="w-2.5 h-2.5" />
             </span>
           </div>
-          <div className="space-y-1.5 pt-1">
-            <div className="flex justify-between text-[11px] text-slate-500 font-medium">
-              <span>Male: 12,000 (49%)</span>
-              <span>Female: 12,500 (51%)</span>
-            </div>
-            <div className="w-full h-2 rounded-xs overflow-hidden flex bg-indigo-200">
-              <div className="bg-[#1a4231] h-full" style={{ width: '49%' }} title="Male 49%"></div>
-              <div className="bg-[#10b981] h-full" style={{ width: '51%' }} title="Female 51%"></div>
-            </div>
-          </div>
+          <p className="text-[10px] text-slate-400">
+            Total registered attendees across all community assemblies.
+          </p>
         </div>
 
-        {/* Metric 2 */}
+        {/* Efficiency ratio */}
         <div className="bg-white p-5 rounded-sm border border-[#1a42310d] space-y-3">
           <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold block">Efficiency Ratio</span>
           <div className="flex items-center justify-between">
-            <h3 className="text-2xl font-black text-slate-800 tracking-tight">88% Target</h3>
-            <span className="text-[10px] bg-emerald-50 text-[#1a4231] font-bold px-1.5 py-0.5 rounded-sm">Optimal</span>
-          </div>
-          <div className="w-full bg-[#1a42310c] h-2 rounded-xs overflow-hidden">
-            <div className="bg-[#1a4231] h-full" style={{ width: '88%' }}></div>
-          </div>
-          <p className="text-[10px] text-slate-400">Total participants validated compared with sector civil registers.</p>
-        </div>
-
-        {/* Metric 3 */}
-        <div className="bg-white p-5 rounded-sm border border-[#1a42310d] space-y-3">
-          <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold block">High Performance cell</span>
-          <div className="flex items-center justify-between">
-            <h3 className="text-2xl font-black text-[#1a4231] tracking-tight">Kacyiru Cell</h3>
-            <span className="text-[10px] bg-emerald-50 text-emerald-800 font-bold px-1.5 py-0.5 rounded-sm flex items-center gap-0.5">
-              94% Index
+            <h3 className="text-2xl font-black text-slate-800 tracking-tight">
+              {attendanceRate.toFixed(1)}% Target
+            </h3>
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${attendanceRate >= 80 ? 'bg-emerald-50 text-[#1a4231]' : 'bg-amber-50 text-amber-700'}`}>
+              {attendanceRate >= 80 ? 'Optimal' : 'Below Target'}
             </span>
           </div>
-          <p className="text-[10px] text-slate-400">Achieved 12 consecutive community assemblies maintaining over 90% attendance.</p>
+          <div className="w-full bg-[#1a42310c] h-2 rounded-xs overflow-hidden">
+            <div className="bg-[#1a4231] h-full transition-all" style={{ width: `${Math.min(attendanceRate, 100)}%` }} />
+          </div>
+          <p className="text-[10px] text-slate-400">Avg. participation rate across completed assemblies.</p>
+        </div>
+
+        {/* Top performing sector */}
+        <div className="bg-white p-5 rounded-sm border border-[#1a42310d] space-y-3">
+          <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold block">High Performance Sector</span>
+          {topCell ? (
+            <>
+              <div className="flex items-center justify-between">
+                <h3 className="text-2xl font-black text-[#1a4231] tracking-tight">{topCell.cellName}</h3>
+                <span className="text-[10px] bg-emerald-50 text-emerald-800 font-bold px-1.5 py-0.5 rounded-sm">
+                  {topCell.attendanceRate.toFixed(1)}% Index
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400">
+                {topCell.meetingCount} assemblies recorded with highest avg. attendance rate.
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-slate-400">No data available.</p>
+          )}
         </div>
 
       </div>
 
-      {/* 2. Side-by-side Layout: Top Cell Rankings vs Detailed table */}
+      {/* 2. Side-by-side: Rankings + Meeting table */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* Top participation by Cell */}
+
+        {/* Top participation rankings */}
         <div className="col-span-12 lg:col-span-4 bg-white p-5 rounded-sm border border-[#1a42310d] space-y-4">
           <div className="pb-3 border-b border-[#1a42310d]">
-            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Top Participation ranking</h3>
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Top Participation Ranking</h3>
             <p className="text-[10px] text-slate-400 mt-0.5">Rankings based on target achievements</p>
           </div>
 
           <div className="space-y-4 pt-1">
-            
-            {/* Rank 1 */}
-            <div className="flex items-center justify-between p-2 hover:bg-slate-50 transition-colors border-b border-slate-50">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-black text-slate-400 w-4 inline-block">#1</span>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-800">Kacyiru Cell</h4>
-                  <span className="text-[9px] text-slate-400 uppercase tracking-wider font-bold">12 Assemblies validated</span>
+            {data?.topCellRankings && data.topCellRankings.length > 0 ? (
+              data.topCellRankings.slice(0, 3).map((cell, idx) => (
+                <div
+                  key={cell.cellName}
+                  className={`flex items-center justify-between p-2 hover:bg-slate-50 transition-colors ${idx < 2 ? 'border-b border-slate-50' : ''}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black text-slate-400 w-4 inline-block">#{idx + 1}</span>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-800">{cell.cellName}</h4>
+                      <span className="text-[9px] text-slate-400 uppercase tracking-wider font-bold">
+                        {cell.meetingCount} Assemblies validated
+                      </span>
+                    </div>
+                  </div>
+                  <span className={`text-xs font-black px-2 py-0.5 rounded-sm ${
+                    idx === 0 ? 'text-[#1a4231] bg-[#1a423108]' : 'text-slate-700 bg-slate-50'
+                  }`}>
+                    {cell.attendanceRate.toFixed(1)}%
+                  </span>
                 </div>
-              </div>
-              <span className="text-xs font-black text-[#1a4231] bg-[#1a423108] px-2 py-0.5 rounded-sm">94%</span>
-            </div>
-
-            {/* Rank 2 */}
-            <div className="flex items-center justify-between p-2 hover:bg-slate-50 transition-colors border-b border-slate-50">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-black text-slate-400 w-4 inline-block">#2</span>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-800">Kimihurura Cell</h4>
-                  <span className="text-[9px] text-slate-400 uppercase tracking-wider font-bold">8 Assemblies validated</span>
-                </div>
-              </div>
-              <span className="text-xs font-black text-slate-700 bg-slate-50 px-2 py-0.5 rounded-sm">91%</span>
-            </div>
-
-            {/* Rank 3 */}
-            <div className="flex items-center justify-between p-2 hover:bg-slate-50 transition-colors">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-black text-slate-400 w-4 inline-block">#3</span>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-800">Remera Cell</h4>
-                  <span className="text-[9px] text-slate-400 uppercase tracking-wider font-bold">10 Assemblies validated</span>
-                </div>
-              </div>
-              <span className="text-xs font-black text-slate-600 bg-slate-50 px-2 py-0.5 rounded-sm">85%</span>
-            </div>
-
+              ))
+            ) : (
+              <p className="text-xs text-slate-400 text-center py-4">No ranking data available.</p>
+            )}
           </div>
         </div>
 
-        {/* Detailed table of recent meeting attendances */}
+        {/* Detailed meeting attendance table */}
         <div className="col-span-12 lg:col-span-8 bg-white p-5 rounded-sm border border-[#1a42310d] space-y-4">
-          
+
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-[#1a42310d]">
             <div>
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Attendance Files Registry</h3>
               <p className="text-[10px] text-slate-400 mt-0.5">Granular citizen counts logged at specific assemblies</p>
             </div>
-
-            {/* Filters */}
             <div className="relative w-full sm:w-48">
               <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
                 <Search className="w-3.5 h-3.5" />
@@ -161,51 +178,50 @@ export const AttendanceSummaryView: React.FC<AttendanceSummaryViewProps> = ({ me
                   <th className="py-2 px-3 text-[9px] font-bold tracking-wider text-slate-500 uppercase">Assembly Identification</th>
                   <th className="py-2 px-3 text-[9px] font-bold tracking-wider text-slate-500 uppercase">Target Register</th>
                   <th className="py-2 px-3 text-[9px] font-bold tracking-wider text-slate-500 uppercase">Participation Rate</th>
-                  <th className="py-2 px-3 text-[9px] font-bold tracking-wider text-slate-500 uppercase text-right">Method</th>
+                  <th className="py-2 px-3 text-[9px] font-bold tracking-wider text-slate-500 uppercase text-right">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredMeetings.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="py-8 text-center text-xs text-slate-400 font-medium">
-                      No meeting attendance sheets matched the specific parameter constraints.
+                      No meeting attendance records matched the search criteria.
                     </td>
                   </tr>
                 ) : (
                   filteredMeetings.map((meeting) => {
-                    const ratio = Math.round((meeting.participants / (meeting.targetCount || 1)) * 100);
-
+                    const ratio = meeting.attendanceRate;
                     return (
-                      <tr key={meeting.id} className="hover:bg-slate-50/50 transition-colors">
+                      <tr key={meeting.meetingId} className="hover:bg-slate-50/50 transition-colors">
                         <td className="py-2 px-3">
                           <p className="text-xs font-bold text-slate-800 truncate leading-snug">{meeting.title}</p>
                           <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-[9px] text-[#1a4231] font-mono font-bold bg-[#1a423108] px-1 rounded-sm uppercase">{meeting.id}</span>
-                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">{meeting.sector}</span>
+                            <span className="text-[9px] text-[#1a4231] font-mono font-bold bg-[#1a423108] px-1 rounded-sm uppercase">
+                              {meeting.meetingId}
+                            </span>
+                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+                              {meeting.sectorName}
+                            </span>
                           </div>
                         </td>
-
                         <td className="py-2 px-3 font-mono text-[11px] text-slate-600 font-bold">
                           {meeting.participants.toLocaleString()} / {meeting.targetCount.toLocaleString()}
                         </td>
-
                         <td className="py-2 px-3">
                           <div className="flex items-center gap-2">
                             <div className="w-16 bg-[#1a42310a] h-1.5 rounded-sm overflow-hidden shrink-0">
-                              <div 
-                                className="bg-[#1a4231] h-full" 
-                                style={{ width: `${ratio}%` }}
-                              ></div>
+                              <div className="bg-[#1a4231] h-full" style={{ width: `${Math.min(ratio, 100)}%` }} />
                             </div>
-                            <span className={`text-[10px] font-bold font-mono ${
-                              ratio >= 85 ? 'text-[#1a4231]' : 'text-slate-600'
-                            }`}>{ratio}%</span>
+                            <span className={`text-[10px] font-bold font-mono ${ratio >= 85 ? 'text-[#1a4231]' : 'text-slate-600'}`}>
+                              {ratio.toFixed(1)}%
+                            </span>
                           </div>
                         </td>
-
                         <td className="py-2 px-3 text-right">
                           <span className="text-[9px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-sm font-semibold uppercase tracking-wider">
-                            {meeting.participants > 0 ? 'Verified' : 'Scheduled'}
+                            {meeting.status === 'COMPLETED' ? 'Verified' :
+                             meeting.status === 'ONGOING' ? 'Live' :
+                             meeting.status === 'POSTPONED' ? 'Postponed' : 'Scheduled'}
                           </span>
                         </td>
                       </tr>
@@ -217,7 +233,6 @@ export const AttendanceSummaryView: React.FC<AttendanceSummaryViewProps> = ({ me
           </div>
 
         </div>
-
       </div>
 
     </div>

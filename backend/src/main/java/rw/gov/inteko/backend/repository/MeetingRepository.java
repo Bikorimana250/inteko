@@ -44,4 +44,13 @@ public interface MeetingRepository extends JpaRepository<Meeting, Long> {
     @Query("SELECT AVG(m.participantsCount * 100.0 / m.targetCount) FROM Meeting m " +
            "WHERE m.status = 'COMPLETED' AND m.targetCount > 0 AND m.deletedAt IS NULL")
     Double getAverageAttendanceRate();
+
+    @Query("SELECT COALESCE(SUM(m.participantsCount), 0) FROM Meeting m WHERE m.deletedAt IS NULL")
+    Long sumAllParticipants();
+
+    @Query("SELECT m.sector.name, COUNT(m), AVG(m.participantsCount * 100.0 / NULLIF(m.targetCount, 0)) " +
+           "FROM Meeting m WHERE m.deletedAt IS NULL " +
+           "GROUP BY m.sector.name " +
+           "ORDER BY AVG(m.participantsCount * 100.0 / NULLIF(m.targetCount, 0)) DESC")
+    List<Object[]> findTopSectorAttendanceRankings();
 }

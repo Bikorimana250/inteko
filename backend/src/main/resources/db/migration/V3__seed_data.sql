@@ -60,7 +60,7 @@ INSERT INTO villages (village_code, name, cell_id, leader_name, population, crea
 -- 4. SEED USER ACCOUNTS
 -- =====================================================
 -- Note: Password for all users is 'password123' hashed with BCrypt
--- Hash: $2a$10$XZq7FZ5Z7qR9QwLvWY4mUO8kGH4aWqJF9XJw8yVqK4qJ5Y2Z7qR9Q
+-- Hash: $2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL4/nO3q
 
 INSERT INTO user_accounts (
     user_code, first_name, last_name, email, password_hash, 
@@ -70,7 +70,7 @@ INSERT INTO user_accounts (
 -- Administrator
 (
     'U-001', 'Admin', 'System', 'admin@inteko.gov.rw',
-    '$2a$10$XZq7FZ5Z7qR9QwLvWY4mUO8kGH4aWqJF9XJw8yVqK4qJ5Y2Z7qR9Q',
+    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL4/nO3q',
     '1198780012345678', '+250788123456', 'System Administrator',
     'Administrator', 'ALL', 'Active',
     NULL, NULL, NULL, CURRENT_TIMESTAMP
@@ -79,21 +79,21 @@ INSERT INTO user_accounts (
 -- Sector Officials
 (
     'U-002', 'Jean Paul', 'Uwimana', 'jp.uwimana@kinyinya.gov.rw',
-    '$2a$10$XZq7FZ5Z7qR9QwLvWY4mUO8kGH4aWqJF9XJw8yVqK4qJ5Y2Z7qR9Q',
+    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL4/nO3q',
     '1198780012345679', '+250788234567', 'Sector Executive Secretary',
     'Sector Official', 'SECTOR_MANAGE', 'Active',
     (SELECT id FROM sectors WHERE sector_code = 'SEC-001'), NULL, NULL, CURRENT_TIMESTAMP
 ),
 (
     'U-003', 'Claudine', 'Mukasine', 'c.mukasine@remera.gov.rw',
-    '$2a$10$XZq7FZ5Z7qR9QwLvWY4mUO8kGH4aWqJF9XJw8yVqK4qJ5Y2Z7qR9Q',
+    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL4/nO3q',
     '1198780012345680', '+250788345678', 'Sector Executive Secretary',
     'Sector Official', 'SECTOR_MANAGE', 'Active',
     (SELECT id FROM sectors WHERE sector_code = 'SEC-002'), NULL, NULL, CURRENT_TIMESTAMP
 ),
 (
     'U-004', 'Emmanuel', 'Nsabimana', 'e.nsabimana@kimironko.gov.rw',
-    '$2a$10$XZq7FZ5Z7qR9QwLvWY4mUO8kGH4aWqJF9XJw8yVqK4qJ5Y2Z7qR9Q',
+    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL4/nO3q',
     '1198780012345681', '+250788456789', 'Sector Executive Secretary',
     'Sector Official', 'SECTOR_MANAGE', 'Active',
     (SELECT id FROM sectors WHERE sector_code = 'SEC-003'), NULL, NULL, CURRENT_TIMESTAMP
@@ -102,7 +102,7 @@ INSERT INTO user_accounts (
 -- Meeting Secretaries
 (
     'U-005', 'Marie', 'Uwera', 'm.uwera@kinyinya.gov.rw',
-    '$2a$10$XZq7FZ5Z7qR9QwLvWY4mUO8kGH4aWqJF9XJw8yVqK4qJ5Y2Z7qR9Q',
+    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL4/nO3q',
     '1198780012345682', '+250788567890', 'Meeting Secretary',
     'Meeting Secretary', 'MEETING_MANAGE', 'Active',
     (SELECT id FROM sectors WHERE sector_code = 'SEC-001'), 
@@ -110,7 +110,7 @@ INSERT INTO user_accounts (
 ),
 (
     'U-006', 'Patrick', 'Habimana', 'p.habimana@remera.gov.rw',
-    '$2a$10$XZq7FZ5Z7qR9QwLvWY4mUO8kGH4aWqJF9XJw8yVqK4qJ5Y2Z7qR9Q',
+    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL4/nO3q',
     '1198780012345683', '+250788678901', 'Meeting Secretary',
     'Meeting Secretary', 'MEETING_MANAGE', 'Active',
     (SELECT id FROM sectors WHERE sector_code = 'SEC-002'),
@@ -118,7 +118,7 @@ INSERT INTO user_accounts (
 ),
 (
     'U-007', 'Grace', 'Mukeshimana', 'g.mukeshimana@kimironko.gov.rw',
-    '$2a$10$XZq7FZ5Z7qR9QwLvWY4mUO8kGH4aWqJF9XJw8yVqK4qJ5Y2Z7qR9Q',
+    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL4/nO3q',
     '1198780012345684', '+250788789012', 'Meeting Secretary',
     'Meeting Secretary', 'MEETING_MANAGE', 'Active',
     (SELECT id FROM sectors WHERE sector_code = 'SEC-003'),
