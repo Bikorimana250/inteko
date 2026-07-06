@@ -26,3 +26,7 @@ logging:
   level:
     rw.gov.inteko: DEBUG
     org.springframework.security: DEBUG
+
+# Dev-only fallback — never use this value in production
+jwt:
+  secret: ${JWT_SECRET:dev-only-secret-key-not-for-production-use-minimum-256-bits}

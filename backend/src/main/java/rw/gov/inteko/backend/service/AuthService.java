@@ -8,6 +8,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import rw.gov.inteko.backend.config.JwtProperties;
 import rw.gov.inteko.backend.dto.request.LoginRequest;
 import rw.gov.inteko.backend.dto.response.AuthResponse;
 import rw.gov.inteko.backend.dto.response.UserResponse;
@@ -27,6 +28,7 @@ public class AuthService {
     
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider tokenProvider;
+    private final JwtProperties jwtProperties;
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     
@@ -62,7 +64,7 @@ public class AuthService {
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .tokenType("Bearer")
-                .expiresIn(24 * 60 * 60L) // 24 hours in seconds
+                .expiresIn(jwtProperties.getExpiration() / 1000)
                 .user(userResponse)
                 .build();
     }
@@ -95,7 +97,7 @@ public class AuthService {
                 .accessToken(newAccessToken)
                 .refreshToken(newRefreshToken)
                 .tokenType("Bearer")
-                .expiresIn(24 * 60 * 60L)
+                .expiresIn(jwtProperties.getExpiration() / 1000)
                 .user(userMapper.toResponse(user))
                 .build();
     }

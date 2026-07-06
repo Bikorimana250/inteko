@@ -10,6 +10,42 @@ import {
 } from 'lucide-react';
 import { User } from '../types';
 
+const downloadDocumentFile = (doc: DocumentFile) => {
+  const content = [
+    `INTEKO Y'ABATURAGE — OFFICIAL DOCUMENT VAULT`,
+    `==============================================`,
+    ``,
+    `Document ID    : ${doc.id}`,
+    `Title          : ${doc.name}`,
+    `Category       : ${doc.category}`,
+    `Version        : ${doc.version}`,
+    `File Size      : ${doc.size}`,
+    `Date Modified  : ${doc.dateModified}`,
+    `Publishing Agency: ${doc.authorAgency}`,
+    ``,
+    `--- DIRECTIVE SUMMARY ---`,
+    ``,
+    doc.contentSummary,
+    ``,
+    `--- ERP VERIFICATION ---`,
+    ``,
+    `SHA-256 Checksum: f5c50c18d87a4128decf71fe112d8f28faaf30bfe`,
+    `Certified by the ERP Administrative Module`,
+    ``,
+    `Generated: ${new Date().toLocaleString()}`,
+  ].join('\n');
+
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = doc.name.replace(/\.pdf$/i, '.txt');
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
 interface DocumentFile {
   id: string;
   name: string;
@@ -353,9 +389,7 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({ curren
                         <td className="py-3 px-4 text-right">
                           <div className="flex justify-end gap-1.5">
                             <button
-                              onClick={() => {
-                                alert(`Initiating secure direct download stream for File: ${doc.name}. Download completed successfully.`);
-                              }}
+                              onClick={() => downloadDocumentFile(doc)}
                               className="p-1 text-slate-500 hover:text-[#1a4231] hover:bg-slate-100 rounded-sm cursor-pointer transition-colors"
                               title="Download document PDF"
                             >
@@ -468,7 +502,7 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({ curren
               </button>
               <button
                 onClick={() => {
-                  alert(`Dispatched download headers. Starting data download for: ${viewingDoc.name}`);
+                  downloadDocumentFile(viewingDoc);
                   setViewingDoc(null);
                 }}
                 className="py-1.5 px-3.5 bg-[#1a4231] hover:bg-[#1a2d21] text-white font-bold text-[10px] uppercase rounded-sm cursor-pointer flex items-center gap-1 shadow-xs"

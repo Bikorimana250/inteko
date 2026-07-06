@@ -10,20 +10,36 @@ import {
 } from 'lucide-react';
 import { Meeting } from '../types';
 
+interface AttendeeEntry {
+  name: string;
+  idNumber: string;
+  phone: string;
+}
+
 interface MeetingListViewProps {
   meetings: Meeting[];
   onAddSimulatedMeeting: (meetingData: Omit<Meeting, 'id' | 'participants'>) => void;
   onUpdateMeetingStatus: (meetingId: string, status: 'Scheduled' | 'Ongoing' | 'Completed' | 'Postponed') => void;
+  onCheckInAttendee: (meetingId: string, attendee: AttendeeEntry) => void;
 }
 
 export const MeetingListView: React.FC<MeetingListViewProps> = ({
   meetings,
   onAddSimulatedMeeting,
-  onUpdateMeetingStatus
+  onUpdateMeetingStatus,
+  onCheckInAttendee
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [showScheduleForm, setShowScheduleForm] = useState(false);
+
+  // Check-in modal state
+  const [checkInMeetingId, setCheckInMeetingId] = useState<string | null>(null);
+  const [checkedInList, setCheckedInList] = useState<AttendeeEntry[]>([]);
+  const [ciName, setCiName] = useState('');
+  const [ciId, setCiId] = useState('');
+  const [ciPhone, setCiPhone] = useState('');
+  const [ciError, setCiError] = useState('');
 
   // Form states
   const [title, setTitle] = useState('');
@@ -68,7 +84,125 @@ export const MeetingListView: React.FC<MeetingListViewProps> = ({
     setShowScheduleForm(false);
   };
 
+  const handleCheckInSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ciName.trim()) { setCiError('Full name is required.'); return; }
+    const attendee: AttendeeEntry = { name: ciName.trim(), idNumber: ciId.trim(), phone: ciPhone.trim() };
+    onCheckInAttendee(checkInMeetingId!, attendee);
+    setCheckedInList(prev => [attendee, ...prev]);
+    setCiName(''); setCiId(''); setCiPhone(''); setCiError('');
+  };
+
+  const openCheckIn = (meetingId: string) => {
+    setCheckInMeetingId(meetingId);
+    setCheckedInList([]);
+    setCiName(''); setCiId(''); setCiPhone(''); setCiError('');
+  };
+
+  const closeCheckIn = () => setCheckInMeetingId(null);
+
+  const activeCheckInMeeting = meetings.find(m => m.id === checkInMeetingId);
+
   return (
+    <>
+    {/* Check-in modal overlay */}
+    {checkInMeetingId && activeCheckInMeeting && (
+      <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+        <div className="bg-white rounded-sm shadow-xl w-full max-w-lg border border-[#1a423126] flex flex-col max-h-[90vh]">
+          
+          {/* Modal header */}
+          <div className="flex items-start justify-between p-4 border-b border-slate-100">
+            <div>
+              <span className="text-[8px] uppercase tracking-widest text-emerald-700 font-bold block">Live Check-in</span>
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-tight leading-snug">{activeCheckInMeeting.title}</h3>
+              <p className="text-[10px] text-slate-400 mt-0.5">{activeCheckInMeeting.location} · {activeCheckInMeeting.date}</p>
+            </div>
+            <button onClick={closeCheckIn} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Attendance counter */}
+          <div className="px-4 py-3 bg-emerald-50 border-b border-emerald-100 flex items-center justify-between">
+            <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Session check-ins</span>
+            <span className="text-lg font-black text-[#1a4231] font-mono">{checkedInList.length}</span>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleCheckInSubmit} className="p-4 space-y-3 border-b border-slate-100">
+            {ciError && (
+              <div className="text-[10px] font-bold text-red-700 bg-red-50 p-2 border-l-[3px] border-red-500 rounded-xs flex items-center gap-1.5">
+                <AlertCircle className="w-3 h-3 shrink-0" />{ciError}
+              </div>
+            )}
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Full Name *</label>
+              <input
+                type="text"
+                value={ciName}
+                onChange={e => setCiName(e.target.value)}
+                placeholder="e.g. Kamanzi Jean Pierre"
+                className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-sm focus:outline-none focus:border-[#1a4231]"
+                autoFocus
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">ID Number</label>
+                <input
+                  type="text"
+                  value={ciId}
+                  onChange={e => setCiId(e.target.value)}
+                  placeholder="16-digit national ID"
+                  maxLength={16}
+                  className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-sm focus:outline-none focus:border-[#1a4231]"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Phone</label>
+                <input
+                  type="text"
+                  value={ciPhone}
+                  onChange={e => setCiPhone(e.target.value)}
+                  placeholder="+250 788 ..."
+                  className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-sm focus:outline-none focus:border-[#1a4231]"
+                />
+              </div>
+            </div>
+            <button
+              type="submit"
+              className="w-full py-1.5 bg-[#1a4231] text-white hover:bg-slate-800 text-[11px] font-bold uppercase rounded-sm tracking-wide cursor-pointer flex items-center justify-center gap-1.5 transition-colors"
+            >
+              <Check className="w-3.5 h-3.5" /> Record Attendance
+            </button>
+          </form>
+
+          {/* Checked-in list this session */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-2">
+            {checkedInList.length === 0 ? (
+              <p className="text-[10px] text-slate-400 text-center py-4">No attendees recorded in this session yet.</p>
+            ) : (
+              checkedInList.map((a, i) => (
+                <div key={i} className="flex items-center gap-3 py-1.5 px-3 bg-emerald-50 border border-emerald-100 rounded-xs">
+                  <Check className="w-3 h-3 text-emerald-600 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-bold text-slate-800 truncate">{a.name}</p>
+                    <p className="text-[9px] text-slate-400 font-mono">{a.idNumber || '—'} · {a.phone || '—'}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="p-3 border-t border-slate-100 flex justify-end">
+            <button onClick={closeCheckIn} className="px-4 py-1.5 border border-slate-200 hover:bg-slate-100 text-slate-600 text-[10px] font-bold uppercase rounded-sm cursor-pointer">
+              Close Session
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
     <div className="space-y-6">
       
       {/* 1. Header showing controls */}
@@ -308,13 +442,22 @@ export const MeetingListView: React.FC<MeetingListViewProps> = ({
                     )}
 
                     {meeting.status === 'Ongoing' && (
-                      <button
-                        onClick={() => onUpdateMeetingStatus(meeting.id, 'Completed')}
-                        className="py-1 px-2 bg-[#1a4231] text-white hover:bg-slate-800 text-[10px] font-bold uppercase rounded-sm cursor-pointer transition-colors"
-                        title="Audit citizen list and archive file"
-                      >
-                        Archive Complete
-                      </button>
+                      <>
+                        <button
+                          onClick={() => openCheckIn(meeting.id)}
+                          className="py-1 px-2 bg-emerald-600 text-white hover:bg-emerald-700 text-[10px] font-bold uppercase rounded-sm cursor-pointer transition-colors flex items-center gap-1"
+                          title="Record attendee check-in"
+                        >
+                          <Check className="w-3 h-3" /> Check In
+                        </button>
+                        <button
+                          onClick={() => onUpdateMeetingStatus(meeting.id, 'Completed')}
+                          className="py-1 px-2 bg-[#1a4231] text-white hover:bg-slate-800 text-[10px] font-bold uppercase rounded-sm cursor-pointer transition-colors"
+                          title="Audit citizen list and archive file"
+                        >
+                          Archive Complete
+                        </button>
+                      </>
                     )}
 
                     {meeting.status !== 'Postponed' && meeting.status !== 'Completed' && (
@@ -337,5 +480,6 @@ export const MeetingListView: React.FC<MeetingListViewProps> = ({
       </div>
 
     </div>
+    </>
   );
 };

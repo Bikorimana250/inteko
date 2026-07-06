@@ -1,5 +1,6 @@
 package rw.gov.inteko.backend.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
@@ -11,27 +12,26 @@ import java.util.List;
 
 @Configuration
 public class CorsConfig {
-    
+
+    @Value("${cors.allowed-origins:http://localhost:5173,http://localhost:3000}")
+    private String allowedOriginsRaw;
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        
-        // Allow frontend origin (update with your frontend URL)
-        configuration.setAllowedOrigins(List.of(
-                "http://localhost:3000",
-                "http://localhost:5173",
-                "https://your-production-frontend.com"
-        ));
-        
+
+        List<String> allowedOrigins = Arrays.asList(allowedOriginsRaw.split(","));
+        configuration.setAllowedOrigins(allowedOrigins);
+
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Accept"));
         configuration.setExposedHeaders(List.of("Authorization"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
-        
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
-        
+
         return source;
     }
 }

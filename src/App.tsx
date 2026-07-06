@@ -525,6 +525,11 @@ export default function App() {
             meetings={searchedMeetings}
             onAddSimulatedMeeting={handleAddSimulatedMeeting}
             onUpdateMeetingStatus={handleUpdateMeetingStatus}
+            onCheckInAttendee={(meetingId, attendee) => {
+              setMeetings(prev => prev.map(m =>
+                m.id === meetingId ? { ...m, participants: m.participants + 1 } : m
+              ));
+            }}
           />
         );
 
@@ -553,6 +558,9 @@ export default function App() {
         return (
           <ReportsAnalyticsView
             currentUser={currentUser}
+            meetings={meetings}
+            issues={issues}
+            users={users}
           />
         );
 

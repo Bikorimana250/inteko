@@ -89,17 +89,15 @@ public class MeetingService {
         
         meeting.setStatus(status);
         
-        if (status == MeetingStatus.COMPLETED && meeting.getParticipantsCount() == 0) {
-            int simulatedCount = (int) (meeting.getTargetCount() * (0.75 + Math.random() * 0.2));
-            meeting.setParticipantsCount(simulatedCount);
-        }
+        // participantsCount stays 0 until actual attendance is recorded via MeetingParticipantService
         
         Meeting updatedMeeting = meetingRepository.save(meeting);
         return meetingMapper.toResponse(updatedMeeting);
     }
     
     private String generateMeetingCode() {
-        long count = meetingRepository.count() + 89;
-        return String.format("#MTG-2023-%03d", count);
+        int year = java.time.LocalDate.now().getYear();
+        long count = meetingRepository.count() + 1;
+        return String.format("#MTG-%d-%03d", year, count);
     }
 }
