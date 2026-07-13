@@ -7,7 +7,7 @@ import java.util.regex.Pattern;
 
 public class RwandaPhoneValidator implements ConstraintValidator<ValidRwandaPhone, String> {
     
-    private static final Pattern PHONE_PATTERN = Pattern.compile("^\\+250\\s\\d{3}\\s\\d{3}\\s\\d{3}$");
+    private static final Pattern PHONE_PATTERN = Pattern.compile("^\\+250[\\s]?\\d{3}[\\s]?\\d{3}[\\s]?\\d{3}$");
     
     @Override
     public boolean isValid(String value, ConstraintValidatorContext context) {

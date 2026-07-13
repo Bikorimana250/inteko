@@ -281,3 +281,6 @@ export interface UserApiResponse {
 
 export const createUser = (payload: CreateUserPayload): Promise<UserApiResponse> =>
   post<UserApiResponse>('/users', payload);
+
+export const fetchUsers = (): Promise<UserApiResponse[]> =>
+  get<UserApiResponse[]>('/users');

@@ -16,7 +16,7 @@ import {
   INITIAL_USERS, INITIAL_MEETINGS, INITIAL_CELLS, 
   INITIAL_NOTIFICATIONS, INITIAL_ISSUES, AVATARS 
 } from './data';
-import { fetchMeetings, fetchIssues, fetchResolutions, fetchNotifications, createMeeting, updateMeetingStatus, concludeResolution, addResolutionComment, toggleResolutionActionItem, CreateMeetingPayload, createIssue, resolveIssue, createUser } from './api';
+import { fetchMeetings, fetchIssues, fetchResolutions, fetchNotifications, createMeeting, updateMeetingStatus, concludeResolution, addResolutionComment, toggleResolutionActionItem, CreateMeetingPayload, createIssue, resolveIssue, createUser, fetchUsers } from './api';
 
 // import sub-views
 import { LoginView } from './components/LoginView';
@@ -285,6 +285,41 @@ export default function App() {
       .catch(() => { /* keep existing data */ });
   }, [isAuthenticated]);
 
+  // Load users from backend when authenticated (Administrator and Sector Official only)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    loadUsersFromBackend();
+  }, [isAuthenticated]);
+
+  const loadUsersFromBackend = () => {
+    fetchUsers()
+      .then((backendUsers) => {
+        const roleMap: Record<string, User['role']> = {
+          ADMINISTRATOR: 'Administrator',
+          SECTOR_OFFICIAL: 'Sector Official',
+          MEETING_SECRETARY: 'Meeting Secretary',
+        };
+        const mapped: User[] = backendUsers.map((u) => ({
+          id: u.userCode ?? String(u.id),
+          name: `${u.firstName} ${u.lastName}`.trim(),
+          email: u.email,
+          role: (roleMap[u.role] ?? u.role) as User['role'],
+          status: (u.status === 'ACTIVE' ? 'Active' : 'Inactive') as User['status'],
+          sector: '',
+          cell: '',
+          village: '',
+          avatar: AVATARS.general,
+          idNumber: '',
+          phone: '',
+          position: '',
+          lastActive: 'N/A',
+          permissions: '',
+        }));
+        setUsers(mapped);
+      })
+      .catch(() => { /* keep existing local data if backend unreachable */ });
+  };
+
   // Auth controllers
   const handleLogin = (userMatched: Partial<User>) => {
     setCurrentUser(userMatched);
@@ -337,36 +372,36 @@ export default function App() {
     setSelectedUserIdToEdit(null);
   };
 
-  const handleSaveUser = (userData: Omit<User, 'id' | 'avatar' | 'lastActive'>) => {
-    const nextId = `U-0${users.length + 1}`;
-    const newUser: User = {
-      ...userData,
-      id: nextId,
-      avatar: AVATARS.general,
-      lastActive: 'Never logged in'
-    };
-    setUsers(prev => [...prev, newUser]);
-
-    // Persist to backend
-    const roleMap: Record<string, string> = {
+  const handleSaveUser = (userData: Omit<User, 'id' | 'avatar' | 'lastActive'>, password: string) => {
+    // Map frontend role label to backend UserRole enum name
+    const roleEnumMap: Record<string, string> = {
       'Administrator': 'ADMINISTRATOR',
       'Sector Official': 'SECTOR_OFFICIAL',
       'Meeting Secretary': 'MEETING_SECRETARY',
     };
+
+    // Split full name into first/last for backend
+    const nameParts = userData.name.trim().split(' ');
+    const firstName = nameParts[0] ?? userData.name;
+    const lastName = nameParts.slice(1).join(' ') || firstName;
+
     createUser({
-      firstName: userData.name.split(' ')[0] ?? userData.name,
-      lastName: userData.name.split(' ').slice(1).join(' ') || userData.name,
+      firstName,
+      lastName,
       email: userData.email,
-      password: (userData as any).password ?? 'password123',
+      password,
       idNumber: userData.idNumber,
       phone: userData.phone,
       position: userData.position,
-      role: roleMap[userData.role] ?? userData.role,
+      role: roleEnumMap[userData.role] ?? userData.role,
       permissions: userData.permissions,
     }).then(() => {
-      showToast(`Staff account created: ${newUser.name} (${newUser.id}). User can now log in via the backend.`);
-    }).catch(() => {
-      showToast(`Account saved locally as ${newUser.name} (${newUser.id}). Note: backend persistence failed — user cannot log in until backend is synced.`, 'error');
+      // Refresh user list from backend so the new user appears correctly
+      loadUsersFromBackend();
+      showToast(`Staff account created: ${userData.name}. User can now log in via the backend.`);
+    }).catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      showToast(`Failed to create account: ${msg}`, 'error');
     });
 
     setCurrentView('User Management');
@@ -720,7 +755,7 @@ export default function App() {
         return (
           <CreateUserView
             onCancel={() => setCurrentView('User Management')}
-            onSaveUser={handleSaveUser}
+            onSaveUser={(userData, password) => handleSaveUser(userData, password)}
           />
         );
 

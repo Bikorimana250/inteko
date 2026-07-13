@@ -9,7 +9,7 @@ import { User, UserRole } from '../types';
 
 interface CreateUserViewProps {
   onCancel: () => void;
-  onSaveUser: (userData: Omit<User, 'id' | 'avatar' | 'lastActive'>) => void;
+  onSaveUser: (userData: Omit<User, 'id' | 'avatar' | 'lastActive'>, password: string) => void;
 }
 
 export const CreateUserView: React.FC<CreateUserViewProps> = ({ onCancel, onSaveUser }) => {
@@ -28,6 +28,18 @@ export const CreateUserView: React.FC<CreateUserViewProps> = ({ onCancel, onSave
   const [permissions, setPermissions] = useState('Level 1 (Staff)');
   
   const [error, setError] = useState('');
+
+  const normalizePhone = (raw: string): string => {
+    // Strip ALL spaces first
+    const stripped = raw.replace(/\s+/g, '');
+    if (stripped.startsWith('07') || stripped.startsWith('08')) {
+      return '+25' + stripped; // 07XXXXXXXXX → +2507XXXXXXXXX
+    }
+    if (stripped.startsWith('250') && !stripped.startsWith('+')) {
+      return '+' + stripped; // 250XXXXXXXXX → +250XXXXXXXXX
+    }
+    return stripped; // already +250... or other
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,11 +61,20 @@ export const CreateUserView: React.FC<CreateUserViewProps> = ({ onCancel, onSave
       return;
     }
 
+    const normalizedPhone = normalizePhone(phone);
+
+    // Validate normalized phone: +250 followed by 9 digits (with or without spaces)
+    const rwandaPhoneRegex = /^\+250[\s]?\d{3}[\s]?\d{3}[\s]?\d{3}$/;
+    if (!rwandaPhoneRegex.test(normalizedPhone)) {
+      setError('Invalid phone number. Use format: +250788123456 or +250 788 123 456 (Rwanda numbers only).');
+      return;
+    }
+
     // Trigger save
     onSaveUser({
       name,
       email,
-      phone,
+      phone: normalizedPhone,
       idNumber,
       role,
       position,
@@ -62,7 +83,7 @@ export const CreateUserView: React.FC<CreateUserViewProps> = ({ onCancel, onSave
       village,
       status,
       permissions
-    });
+    }, password);
   };
 
   return (
@@ -160,9 +181,10 @@ export const CreateUserView: React.FC<CreateUserViewProps> = ({ onCancel, onSave
                   required
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+250 788 123 456"
+                  placeholder="+250788123456"
                   className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-sm focus:outline-none focus:border-[#1a4231] focus:ring-1 focus:ring-[#1a4231]"
                 />
+                <p className="text-[9px] text-slate-400 mt-0.5">Accepted: +250788123456 · +250 788 123 456 · 0788123456</p>
               </div>
             </div>
           </div>
