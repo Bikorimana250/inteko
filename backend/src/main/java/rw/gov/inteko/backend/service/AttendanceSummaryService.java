@@ -10,9 +10,7 @@ import rw.gov.inteko.backend.entity.Meeting;
 import rw.gov.inteko.backend.repository.MeetingParticipantRepository;
 import rw.gov.inteko.backend.repository.MeetingRepository;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -24,17 +22,13 @@ public class AttendanceSummaryService {
     private final MeetingParticipantRepository participantRepository;
 
     public AttendanceSummaryResponse getSummary() {
-        // 1. Total participants — count actual rows in meeting_participants
-        long totalParticipants = participantRepository.count();
-
-        // 2. Build a map of meetingId -> actual participant count from the participants table
-        Map<Long, Long> participantCountByMeeting = new HashMap<>();
-        for (Object[] row : participantRepository.countParticipantsPerMeeting()) {
-            participantCountByMeeting.put(((Number) row[0]).longValue(), ((Number) row[1]).longValue());
-        }
-
-        // 3. Compute overall attendance rate from actual data
+        // 1. Total participants — sum participantsCount from meetings (consistent with MeetingListView)
         List<Meeting> allMeetings = meetingRepository.findAllActiveMeetings();
+        long totalParticipants = allMeetings.stream()
+                .mapToLong(m -> m.getParticipantsCount() != null ? m.getParticipantsCount() : 0)
+                .sum();
+
+        // 2. Compute overall attendance rate
         long totalTarget = allMeetings.stream()
                 .mapToLong(m -> m.getTargetCount() != null ? m.getTargetCount() : 0)
                 .sum();
@@ -54,10 +48,10 @@ public class AttendanceSummaryService {
                 })
                 .collect(Collectors.toList());
 
-        // 5. Per-meeting rows — use actual participant counts
+        // 5. Per-meeting rows — use Meeting.participantsCount (same source as MeetingListView)
         List<MeetingAttendanceItem> meetingItems = allMeetings.stream()
                 .map(m -> {
-                    long actualParticipants = participantCountByMeeting.getOrDefault(m.getId(), 0L);
+                    int actualParticipants = m.getParticipantsCount() != null ? m.getParticipantsCount() : 0;
                     int target = m.getTargetCount() != null ? m.getTargetCount() : 0;
                     double ratio = target > 0
                             ? Math.round((actualParticipants * 100.0 / target) * 10.0) / 10.0
@@ -67,7 +61,7 @@ public class AttendanceSummaryService {
                             m.getMeetingCode(),
                             m.getTitle(),
                             sectorName,
-                            (int) actualParticipants,
+                            actualParticipants,
                             target,
                             ratio,
                             m.getStatus().name()

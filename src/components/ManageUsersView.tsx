@@ -5,10 +5,10 @@
 
 import React, { useState } from 'react';
 import { 
-  Plus, Search, ShieldCheck, Mail, Phone, SlidersHorizontal, 
-  Trash2, Edit2, Upload, HelpCircle, UserX, FileDown 
+  Plus, Search, ShieldCheck, Mail, Phone,
+  Trash2, Edit2, Upload
 } from 'lucide-react';
-import { User, UserRole } from '../types';
+import { User } from '../types';
 
 interface ManageUsersViewProps {
   users: User[];
@@ -28,8 +28,6 @@ export const ManageUsersView: React.FC<ManageUsersViewProps> = ({
   const [searchParam, setSearchParam] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('All');
   const [statusFilter, setStatusFilter] = useState<string>('All');
-  const [showBulkUpload, setShowBulkUpload] = useState(false);
-  const [bulkLog, setBulkLog] = useState('');
 
   // Filtering users realistically
   const filteredUsers = users.filter((user) => {
@@ -44,40 +42,33 @@ export const ManageUsersView: React.FC<ManageUsersViewProps> = ({
     return matchesSearch && matchesRole && matchesStatus;
   });
 
-  const handleBulkSimulate = (e: React.FormEvent) => {
-    e.preventDefault();
-    setBulkLog('Analyzing CSV schema... Detected columns (Name, Email, Role, Phone, Sector, Cell, Village). Validating 12 candidate records... Success! Bulk import completed.');
-    setTimeout(() => {
-      setBulkLog('');
-      setShowBulkUpload(false);
-    }, 4500);
-  };
+
 
   return (
     <div className="space-y-6">
       
-      {/* Overview Cards Panel resembling references */}
+      {/* Overview Cards Panel */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white p-4 rounded-sm border border-[#1a42310d] flex items-center justify-between shadow-xs">
           <div>
             <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">Active Staff Directory</span>
-            <p className="text-xl font-extrabold text-slate-800 font-sans tracking-tight">152 Officials</p>
-            <p className="text-[10px] text-emerald-700 font-semibold mt-0.5">8 Sectors represented</p>
+            <p className="text-xl font-extrabold text-slate-800 font-sans tracking-tight">{users.filter(u => u.status === 'Active').length} Officials</p>
+            <p className="text-[10px] text-emerald-700 font-semibold mt-0.5">{users.length} total accounts</p>
           </div>
           <div className="flex -space-x-1.5 overflow-hidden">
             <span className="inline-block w-6 h-6 rounded-full bg-slate-300 ring-2 ring-white text-[9px] flex items-center justify-center font-bold text-slate-700">UA</span>
             <span className="inline-block w-6 h-6 rounded-full bg-slate-400 ring-2 ring-white text-[9px] flex items-center justify-center font-bold text-white">MK</span>
-            <span className="inline-block w-6 h-6 rounded-full bg-slate-500 ring-2 ring-white text-[9px] flex items-center justify-center font-bold text-emerald-100">+12</span>
+            <span className="inline-block w-6 h-6 rounded-full bg-slate-500 ring-2 ring-white text-[9px] flex items-center justify-center font-bold text-emerald-100">+{Math.max(0, users.length - 2)}</span>
           </div>
         </div>
 
         <div className="bg-white p-4 rounded-sm border border-[#1a42310d] flex items-center justify-between shadow-xs">
           <div>
-            <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">Pending Invitations</span>
-            <p className="text-xl font-extrabold text-slate-800 font-sans tracking-tight">12 Pending</p>
-            <p className="text-[10px] text-amber-700 font-semibold mt-0.5">Expiring in 7 days</p>
+            <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">Inactive Accounts</span>
+            <p className="text-xl font-extrabold text-slate-800 font-sans tracking-tight">{users.filter(u => u.status === 'Inactive').length} Inactive</p>
+            <p className="text-[10px] text-amber-700 font-semibold mt-0.5">Pending review</p>
           </div>
-          <span className="text-[9px] bg-amber-50 text-amber-800 font-bold px-2 py-1 rounded-sm">Remind All</span>
+          <span className="text-[9px] bg-amber-50 text-amber-800 font-bold px-2 py-1 rounded-sm">Review</span>
         </div>
 
         <div className="bg-white p-4 rounded-sm border border-[#1a42310d] flex items-center justify-between shadow-xs">
@@ -139,13 +130,14 @@ export const ManageUsersView: React.FC<ManageUsersViewProps> = ({
               </select>
             </div>
 
-            {/* Bulk Import Trigger toggle */}
+            {/* Bulk Import Trigger toggle — placeholder, not yet implemented */}
             <button
-              onClick={() => setShowBulkUpload(!showBulkUpload)}
-              className="py-1 px-2.5 bg-[#1a42310d] text-[#1a4231] hover:bg-[#1a423114] text-xs font-bold rounded-sm tracking-wide transition-colors flex items-center gap-1.5 cursor-pointer border border-[#1a423105]"
+              disabled
+              className="py-1 px-2.5 bg-slate-50 text-slate-400 text-xs font-bold rounded-sm tracking-wide flex items-center gap-1.5 border border-slate-200 cursor-not-allowed"
+              title="Bulk import requires backend file upload endpoint"
             >
               <Upload className="w-3.5 h-3.5" />
-              <span>Bulk Action</span>
+              <span>Bulk Import</span>
             </button>
 
             {/* Create User main trigger */}
@@ -159,41 +151,6 @@ export const ManageUsersView: React.FC<ManageUsersViewProps> = ({
           </div>
         </div>
 
-        {/* Bulk Upload simulation drawers */}
-        {showBulkUpload && (
-          <div className="bg-slate-50/75 p-3.5 border border-dashed border-[#1a423133] rounded-sm space-y-3">
-            <div className="flex justify-between items-start">
-              <div>
-                <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Simulate Bulk Attendance / User Import</h4>
-                <p className="text-[10px] text-slate-500">Upload a single spreadsheet CSV incorporating multiple administrative personnel files.</p>
-              </div>
-              <HelpCircle className="w-4 h-4 text-slate-400" />
-            </div>
-
-            <form onSubmit={handleBulkSimulate} className="flex flex-col sm:flex-row gap-3">
-              <input 
-                type="file" 
-                accept=".csv"
-                required
-                className="text-xs bg-white border border-slate-200 rounded-sm p-1 flex-1 focus:outline-none" 
-              />
-              <button 
-                type="submit"
-                className="px-4 py-1.5 bg-[#1a4231] text-white hover:bg-slate-800 text-xs font-bold uppercase rounded-sm cursor-pointer whitespace-nowrap"
-              >
-                Start Verification Flow
-              </button>
-            </form>
-
-            {bulkLog && (
-              <div className="text-[10px] font-mono p-2.5 bg-slate-900 text-emerald-400 rounded-xs border border-slate-800 leading-normal">
-                {bulkLog}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Directory Output Grid */}
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>

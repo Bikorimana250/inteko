@@ -16,7 +16,7 @@ import {
   INITIAL_USERS, INITIAL_MEETINGS, INITIAL_CELLS, 
   INITIAL_NOTIFICATIONS, INITIAL_ISSUES, AVATARS 
 } from './data';
-import { fetchMeetings } from './api';
+import { fetchMeetings, fetchIssues, fetchResolutions, fetchNotifications, createMeeting, updateMeetingStatus, concludeResolution, addResolutionComment, toggleResolutionActionItem, CreateMeetingPayload, createIssue, resolveIssue, createUser } from './api';
 
 // import sub-views
 import { LoginView } from './components/LoginView';
@@ -37,9 +37,19 @@ import { SectorOfficialDashboardView } from './components/SectorOfficialDashboar
 import { DocumentLibraryView } from './components/DocumentLibraryView';
 
 export default function App() {
+  // Clear stale localStorage if data version has changed
+  const APP_DATA_VERSION = '3';
+  if (localStorage.getItem('inteko_data_version') !== APP_DATA_VERSION) {
+    localStorage.removeItem('inteko_users_registry');
+    localStorage.removeItem('inteko_cells_registry');
+    localStorage.setItem('inteko_data_version', APP_DATA_VERSION);
+  }
+
   // 1. Core Reactive States backed by LocalStorage persistence
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return localStorage.getItem('inteko_auth_state') === 'true';
+    const authState = localStorage.getItem('inteko_auth_state') === 'true';
+    const hasToken = !!localStorage.getItem('inteko_jwt_token');
+    return authState && hasToken; // must have BOTH — tokenless sessions are rejected
   });
 
   const [currentUser, setCurrentUser] = useState<Partial<User>>(() => {
@@ -138,6 +148,16 @@ export default function App() {
   const [globalSearchQuery, setGlobalSearchQuery] = useState<string>('');
   const [showProfileDropdown, setShowProfileDropdown] = useState<boolean>(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+  // Inline toast notification (replaces alert() calls)
+  const [toastMessage, setToastMessage] = useState<string>('');
+  const [toastType, setToastType] = useState<'success' | 'error'>('success');
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToastMessage(msg);
+    setToastType(type);
+    setTimeout(() => setToastMessage(''), 4000);
+  };
+  // Inline confirm dialog state
+  const [confirmState, setConfirmState] = useState<{ message: string; onConfirm: () => void } | null>(null);
 
   // Sync to LocalStorage
   useEffect(() => {
@@ -192,6 +212,79 @@ export default function App() {
       });
   }, []);
 
+  // Load issues from backend when authenticated
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    fetchIssues()
+      .then((backendIssues) => {
+        const mapped: CitizenIssue[] = backendIssues.map((i) => ({
+          id: i.issueCode ?? String(i.id),
+          title: i.title,
+          category: (i.category as CitizenIssue['category']) ?? 'Infrastructure',
+          status: (['Active','Resolved','Processing','Success'].includes(i.status)
+            ? i.status : 'Active') as CitizenIssue['status'],
+          reporter: i.reporterName ?? 'Unknown',
+          time: i.createdAt ? new Date(i.createdAt).toLocaleDateString() : 'Unknown',
+        }));
+        setIssues(mapped);
+      })
+      .catch(() => { /* keep existing data */ });
+  }, [isAuthenticated]);
+
+  // Load resolutions from backend when authenticated
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    fetchResolutions()
+      .then((backendResolutions) => {
+        const mapped = backendResolutions.map((r) => ({
+          id: r.resolutionCode ?? String(r.id),
+          dbId: r.id,
+          title: r.title,
+          summary: r.summary ?? '',
+          status: r.status === 'Concluded' ? 'Concluded' : 'Active',
+          progress: r.progressPercentage ?? 0,
+          assignedUnit: r.assignedUnit ?? '',
+          responsibleOfficer: r.responsibleOfficer ?? '',
+          dueDate: r.dueDate ?? '',
+          dateCreated: r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '',
+          actionItems: (r.actionItems ?? []).map((a) => ({
+            dbId: a.id,
+            label: a.itemLabel,
+            checked: a.isCompleted ?? false,
+          })),
+          comments: (r.comments ?? []).map((c) => ({
+            author: c.authorName,
+            role: '',
+            text: c.commentText,
+            time: c.createdAt ? new Date(c.createdAt).toLocaleDateString() : '',
+          })),
+          supportingDocuments: [],
+        }));
+        setResolutions(mapped);
+      })
+      .catch(() => { /* keep existing data */ });
+  }, [isAuthenticated]);
+
+  // Load notifications from backend when authenticated
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    fetchNotifications()
+      .then((backendNotifs) => {
+        const mapped: SystemNotification[] = backendNotifs.map((n) => ({
+          id: String(n.id),
+          title: n.title,
+          message: n.message,
+          category: (['Meeting','Issue','Resolution','System'].includes(n.category)
+            ? n.category : 'System') as SystemNotification['category'],
+          time: n.createdAt ? new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+          unread: !n.isRead,
+          actionLabel: n.actionLabel,
+        }));
+        setNotifications(mapped);
+      })
+      .catch(() => { /* keep existing data */ });
+  }, [isAuthenticated]);
+
   // Auth controllers
   const handleLogin = (userMatched: Partial<User>) => {
     setCurrentUser(userMatched);
@@ -223,9 +316,13 @@ export default function App() {
   };
 
   const handleDeleteUser = (userId: string) => {
-    if (window.confirm(`Revoke security credentials and delete administrative user account file permanently?`)) {
-      setUsers(prev => prev.filter(u => u.id !== userId));
-    }
+    setConfirmState({
+      message: 'Revoke security credentials and delete administrative user account file permanently?',
+      onConfirm: () => {
+        setUsers(prev => prev.filter(u => u.id !== userId));
+        setConfirmState(null);
+      }
+    });
   };
 
   const handleTriggerEdit = (userId: string) => {
@@ -235,7 +332,7 @@ export default function App() {
 
   const handleUpdateUser = (userId: string, updatedData: Partial<User>) => {
     setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updatedData, lastActive: 'Just now' } : u));
-    alert('User administrative file modified and committed to the security database successfully!');
+    showToast('User administrative file modified and committed to the security database successfully!');
     setCurrentView('User Management');
     setSelectedUserIdToEdit(null);
   };
@@ -249,7 +346,29 @@ export default function App() {
       lastActive: 'Never logged in'
     };
     setUsers(prev => [...prev, newUser]);
-    alert(`Success! Committed new staff account: ${newUser.name} assigned with system ID ${newUser.id}`);
+
+    // Persist to backend
+    const roleMap: Record<string, string> = {
+      'Administrator': 'ADMINISTRATOR',
+      'Sector Official': 'SECTOR_OFFICIAL',
+      'Meeting Secretary': 'MEETING_SECRETARY',
+    };
+    createUser({
+      firstName: userData.name.split(' ')[0] ?? userData.name,
+      lastName: userData.name.split(' ').slice(1).join(' ') || userData.name,
+      email: userData.email,
+      password: (userData as any).password ?? 'password123',
+      idNumber: userData.idNumber,
+      phone: userData.phone,
+      position: userData.position,
+      role: roleMap[userData.role] ?? userData.role,
+      permissions: userData.permissions,
+    }).then(() => {
+      showToast(`Staff account created: ${newUser.name} (${newUser.id}). User can now log in via the backend.`);
+    }).catch(() => {
+      showToast(`Account saved locally as ${newUser.name} (${newUser.id}). Note: backend persistence failed — user cannot log in until backend is synced.`, 'error');
+    });
+
     setCurrentView('User Management');
   };
 
@@ -311,18 +430,124 @@ export default function App() {
     setNotifications(prev => [newNotif, ...prev]);
   };
 
+  // Create a real issue via backend (POST /issues — public endpoint)
+  const handleCreateIssue = (issueData: { title: string; description: string; category: string; reporterName: string; reporterPhone: string; }) => {
+    // Optimistic local add
+    const tempIssue: CitizenIssue = {
+      id: `I-${Date.now().toString().slice(-4)}`,
+      title: issueData.title,
+      category: issueData.category as CitizenIssue['category'],
+      status: 'Active',
+      reporter: issueData.reporterName,
+      time: 'Just now',
+    };
+    setIssues(prev => [tempIssue, ...prev]);
+
+    createIssue({
+      title: issueData.title,
+      description: issueData.description,
+      category: issueData.category,
+      reporterName: issueData.reporterName,
+      reporterPhone: issueData.reporterPhone,
+    }).then((created) => {
+      // Replace temp with real backend record
+      setIssues(prev => prev.map(i =>
+        i.id === tempIssue.id
+          ? { ...i, id: created.issueCode ?? String(created.id) }
+          : i
+      ));
+      showToast('Issue submitted and registered in the system.');
+    }).catch(() => {
+      showToast('Issue saved locally. Backend sync failed — will retry on next load.', 'error');
+    });
+  };
+
+  // Resolve an issue via backend (PATCH /issues/{id}/resolve — Sector Official only)
+  const handleResolveIssue = (issueId: string) => {
+    // Optimistic local update
+    setIssues(prev => prev.map(i => i.id === issueId ? { ...i, status: 'Resolved' as CitizenIssue['status'] } : i));
+
+    // Find numeric DB id — issues loaded from backend have numeric string ids or issueCode
+    // Try to derive a numeric id; if not available, backend call will fail gracefully
+    const numericId = parseInt(issueId.replace(/\D/g, ''), 10);
+    if (!isNaN(numericId) && numericId > 0) {
+      resolveIssue(numericId)
+        .then(() => showToast('Issue marked as resolved.'))
+        .catch(() => showToast('Issue resolved locally. Backend sync failed.', 'error'));
+    } else {
+      showToast('Issue resolved locally. Backend ID unavailable — refresh after backend sync.');
+    }
+  };
+
   const handleMeetingCreated = (newMtg: Meeting) => {
     setMeetings(prev => [newMtg, ...prev]);
+    // Refresh from backend to get the real DB record with dbId
+    fetchMeetings()
+      .then((backendMeetings) => {
+        const mapped: Meeting[] = backendMeetings.map((m) => ({
+          id: m.meetingCode ? `#${m.meetingCode}` : `#MTG-${m.id}`,
+          dbId: m.id,
+          title: m.title,
+          date: m.meetingDate,
+          time: m.meetingTime,
+          location: m.location,
+          status: (m.status as Meeting['status']) || 'Scheduled',
+          participants: m.participantsCount ?? 0,
+          targetCount: m.targetCount,
+          sector: m.sectorName ?? '',
+        }));
+        setMeetings(mapped);
+      })
+      .catch(() => {});
   };
 
   const handleUpdateMeetingStatus = (meetingId: string, status: 'Scheduled' | 'Ongoing' | 'Completed' | 'Postponed') => {
-    setMeetings(prev => prev.map(m => {
-      if (m.id === meetingId) {
-        // If transitioning to Completed, simulate random participants count
-        const pts = status === 'Completed' ? Math.floor(m.targetCount * (0.75 + Math.random() * 0.2)) : m.participants;
-        return { ...m, status, participants: pts };
+    // Map frontend status to backend enum
+    const statusMap: Record<string, string> = {
+      Scheduled: 'SCHEDULED', Ongoing: 'ONGOING', Completed: 'COMPLETED', Postponed: 'POSTPONED'
+    };
+    // Optimistic local update first
+    setMeetings(prev => prev.map(m => m.id === meetingId ? { ...m, status } : m));
+    // Persist to backend if we have a dbId
+    const meeting = meetings.find(m => m.id === meetingId);
+    if (meeting?.dbId) {
+      updateMeetingStatus(meeting.dbId, statusMap[status] ?? status)
+        .catch(() => { /* best-effort — local state already updated */ });
+    }
+  };
+
+  // Resolution backend actions
+  const handleApproveAndCloseResolution = (resolutionId: string) => {
+    setResolutions(prev => prev.map(r => r.id === resolutionId ? { ...r, status: 'Concluded', progress: 100 } : r));
+    const res = resolutions.find(r => r.id === resolutionId);
+    if (res?.dbId) {
+      concludeResolution(res.dbId).catch(() => {});
+    }
+  };
+
+  const handleAddResolutionComment = (resolutionId: string, comment: any) => {
+    setResolutions(prev => prev.map(r => r.id === resolutionId ? {
+      ...r, comments: [comment, ...(r.comments || [])]
+    } : r));
+    const res = resolutions.find(r => r.id === resolutionId);
+    if (res?.dbId) {
+      addResolutionComment(res.dbId, comment.text).catch(() => {});
+    }
+  };
+
+  const handleToggleResolutionActionItem = (resolutionId: string, itemIdx: number) => {
+    setResolutions(prev => prev.map(r => {
+      if (r.id !== resolutionId) return r;
+      const items = [...(r.actionItems || [])];
+      if (items[itemIdx]) items[itemIdx] = { ...items[itemIdx], checked: !items[itemIdx].checked };
+      const checkedCount = items.filter((i: any) => i.checked).length;
+      const progressVal = Math.round((checkedCount / items.length) * 100);
+      const item = items[itemIdx];
+      // Call backend if we have dbIds
+      if (r.dbId && item?.dbId) {
+        toggleResolutionActionItem(r.dbId, item.dbId).catch(() => {});
       }
-      return m;
+      return { ...r, actionItems: items, progress: progressVal };
     }));
   };
 
@@ -364,21 +589,21 @@ export default function App() {
       
       case 'Sector Official':
         return [
-          { group: 'Main Administrative Gate', items: [{ view: 'Dashboard', label: 'Sector Official Dashboard', icon: Layers }] },
-          { group: 'Assembly management', items: [
-              { view: 'Meeting List', label: 'Meetings Calendar list', icon: Calendar },
-              { view: 'Attendance Summary', label: 'Attendance Summary', icon: Users }
+          { group: 'Strategic Overview', items: [{ view: 'Dashboard', label: 'Sector Dashboard', icon: Layers }] },
+          { group: 'Meeting Management', items: [
+              { view: 'Meeting List', label: 'Schedule & Manage Meetings', icon: Calendar },
+              { view: 'Attendance Summary', label: 'Attendance Reports', icon: Users }
             ] 
           },
-          { group: 'Citizen tracking queue', items: [
-              { view: 'Citizen Issues', label: 'Issue Tracking', icon: AlertTriangle },
-              { view: 'Resolutions', label: 'Resolution Tracking', icon: FileText }
+          { group: 'Issue & Resolution Management', items: [
+              { view: 'Citizen Issues', label: 'Manage Citizen Issues', icon: AlertTriangle },
+              { view: 'Resolutions', label: 'Resolution Tracking & Approval', icon: FileText }
             ] 
           },
-          { group: 'Analytics & Policy Library', items: [
-              { view: 'Notifications', label: 'Portal Notification Center', icon: Bell },
-              { view: 'Reports & Analytics', label: 'National Performance reports', icon: Layers },
-              { view: 'Documents', label: 'Document Library', icon: FileText },
+          { group: 'Reports & Documents', items: [
+              { view: 'Reports & Analytics', label: 'Sector Performance Reports', icon: Layers },
+              { view: 'Documents', label: 'Policy Documents', icon: FileText },
+              { view: 'Notifications', label: 'Notification Center', icon: Bell },
               { view: 'Settings', label: 'System Settings', icon: Building2 }
             ] 
           }
@@ -386,19 +611,15 @@ export default function App() {
 
       case 'Meeting Secretary':
         return [
-          { group: 'Assembly management', items: [
-              { view: 'Meeting List', label: 'Meetings Calendar list', icon: Calendar },
-              { view: 'Attendance Summary', label: 'Attendance Summary', icon: Users }
+          { group: 'Meeting Operations', items: [
+              { view: 'Meeting List', label: 'Conduct Meetings & Check-ins', icon: Calendar },
+              { view: 'Attendance Summary', label: 'My Attendance Records', icon: Users }
             ] 
           },
-          { group: 'Citizen tracking queue', items: [
-              { view: 'Citizen Issues', label: 'Issue Tracking', icon: AlertTriangle },
-              { view: 'Resolutions', label: 'Resolution Tracking', icon: FileText }
-            ] 
-          },
-          { group: 'Analytics & Policy Library', items: [
-              { view: 'Notifications', label: 'Portal Notification Center', icon: Bell },
-              { view: 'Documents', label: 'Document Library', icon: FileText }
+          { group: 'Reference Information', items: [
+              { view: 'Citizen Issues', label: 'View Issues (Read-Only)', icon: AlertTriangle },
+              { view: 'Documents', label: 'Meeting Documents', icon: FileText },
+              { view: 'Notifications', label: 'My Notifications', icon: Bell }
             ] 
           }
         ];
@@ -425,7 +646,7 @@ export default function App() {
               resolutions={resolutions}
               onNavigateToView={(view) => setCurrentView(view)}
               onApproveQuickResolution={(resId) => {
-                setResolutions(prev => prev.map(r => r.id === resId ? { ...r, status: 'Concluded', progress: 100 } : r));
+                handleApproveAndCloseResolution(resId);
               }}
             />
           );
@@ -442,15 +663,12 @@ export default function App() {
             }}
             onCreateUserTrigger={() => {
               if (!isAdmin) {
-                alert('Access restricted. Only system Administrators are authorized to initialize staff directory profiles.');
+                showToast('Access restricted. Only system Administrators are authorized to initialize staff directory profiles.', 'error');
                 return;
               }
               setCurrentView('Create User');
             }}
             onNavigateToView={(view) => setCurrentView(view)}
-            onAddSimulatedIssue={() => {
-              handleAddLiveIssue();
-            }}
           />
         );
 
@@ -468,12 +686,6 @@ export default function App() {
                 </div>
               </div>
               <div className="pt-2 flex justify-end gap-2">
-                <button 
-                  onClick={() => handleLogin(users.find(u => u.role === 'Administrator') || users[2])}
-                  className="py-1 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] uppercase rounded-sm cursor-pointer border border-slate-200"
-                >
-                  Assume Admin Clearance (Developer Key)
-                </button>
                 <button 
                   onClick={() => setCurrentView('Dashboard')}
                   className="py-1 px-3 bg-[#1a4231] text-white hover:bg-slate-800 font-bold text-[10px] uppercase rounded-sm cursor-pointer"
@@ -529,7 +741,6 @@ export default function App() {
         return (
           <CellsVillagesView
             cells={cells}
-            onAddSimulatedVillage={handleAddSimulatedVillage}
           />
         );
 
@@ -543,6 +754,8 @@ export default function App() {
             meetings={searchedMeetings}
             onMeetingCreated={handleMeetingCreated}
             onUpdateMeetingStatus={handleUpdateMeetingStatus}
+            userRole={currentUser.role}
+            onNavigateToView={(view) => setCurrentView(view)}
             onCheckInAttendee={(meetingId, attendee) => {
               setMeetings(prev => prev.map(m =>
                 m.id === meetingId ? { ...m, participants: m.participants + 1 } : m
@@ -589,8 +802,11 @@ export default function App() {
               setCurrentView('Edit Issue');
             }}
             onTriggerViewIssue={(issueId) => {
-              alert(`Selected Issue Reference ID: ${issueId}. Accessing standard system files...`);
+              setSelectedIssueIdToEdit(issueId);
+              setCurrentView('Edit Issue');
             }}
+            onCreateIssue={handleCreateIssue}
+            onResolveIssue={handleResolveIssue}
             onNavigateToView={(view) => setCurrentView(view)}
           />
         );
@@ -606,7 +822,7 @@ export default function App() {
             }}
             onUpdateIssueToState={(issueId, updatedFields) => {
               setIssues(prev => prev.map(i => i.id === issueId ? { ...i, ...updatedFields } : i));
-              alert('Administrative issue files successfully updated in regional records.');
+              showToast('Administrative issue files successfully updated in regional records.');
               setCurrentView('Citizen Issues');
               setSelectedIssueIdToEdit(null);
             }}
@@ -636,29 +852,9 @@ export default function App() {
               setCurrentView('Resolutions');
               setSelectedResolutionId(null);
             }}
-            onApproveAndClose={(resId) => {
-              setResolutions(prev => prev.map(r => r.id === resId ? { ...r, status: 'Concluded', progress: 100 } : r));
-            }}
-            onAddComment={(resId, comment) => {
-              setResolutions(prev => prev.map(r => r.id === resId ? {
-                ...r,
-                comments: [comment, ...(r.comments || [])]
-              } : r));
-            }}
-            onToggleActionItem={(resId, itemIdx) => {
-              setResolutions(prev => prev.map(r => {
-                if (r.id === resId) {
-                  const items = [...(r.actionItems || [])];
-                  if (items[itemIdx]) {
-                    items[itemIdx] = { ...items[itemIdx], checked: !items[itemIdx].checked };
-                  }
-                  const checkedCount = items.filter(i => i.checked).length;
-                  const progressVal = Math.round((checkedCount / items.length) * 100);
-                  return { ...r, actionItems: items, progress: progressVal };
-                }
-                return r;
-              }));
-            }}
+            onApproveAndClose={handleApproveAndCloseResolution}
+            onAddComment={handleAddResolutionComment}
+            onToggleActionItem={handleToggleResolutionActionItem}
           />
         );
 
@@ -690,13 +886,13 @@ export default function App() {
         );
 
       default:
-        return <DashboardView currentUser={currentUser} users={users} meetings={meetings} issues={issues} onCreateMeetingTrigger={() => setCurrentView('Meeting List')} onCreateUserTrigger={() => setCurrentView('Create User')} onNavigateToView={(view) => setCurrentView(view)} onAddSimulatedIssue={handleAddLiveIssue} />;
+        return <DashboardView currentUser={currentUser} users={users} meetings={meetings} issues={issues} onCreateMeetingTrigger={() => setCurrentView('Meeting List')} onCreateUserTrigger={() => setCurrentView('Create User')} onNavigateToView={(view) => setCurrentView(view)} />;
     }
   };
 
   // Render Login state check
   if (!isAuthenticated) {
-    return <LoginView onLoginSuccess={handleLogin} availableUsers={users} />;
+    return <LoginView onLoginSuccess={handleLogin} />;
   }
 
   // Active unread alerts badge
@@ -943,6 +1139,41 @@ export default function App() {
         </main>
 
       </div>
+
+      {/* ---- INLINE TOAST NOTIFICATION (replaces alert()) ---- */}
+      {toastMessage && (
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-sm shadow-lg text-xs font-bold flex items-center gap-2 border ${
+          toastType === 'success'
+            ? 'bg-[#1a4231] text-white border-[#10b981]'
+            : 'bg-red-700 text-white border-red-400'
+        }`}>
+          <span className={`w-2 h-2 rounded-full shrink-0 ${toastType === 'success' ? 'bg-emerald-400' : 'bg-red-300'}`}></span>
+          {toastMessage}
+        </div>
+      )}
+
+      {/* ---- INLINE CONFIRM DIALOG (replaces window.confirm()) ---- */}
+      {confirmState && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-sm shadow-xl border border-[#1a423126] max-w-sm w-full p-6 space-y-4">
+            <p className="text-xs font-bold text-slate-800 leading-relaxed">{confirmState.message}</p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setConfirmState(null)}
+                className="px-4 py-1.5 border border-slate-200 text-slate-600 hover:bg-slate-50 text-[10px] font-bold uppercase rounded-sm cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmState.onConfirm}
+                className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold uppercase rounded-sm cursor-pointer"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

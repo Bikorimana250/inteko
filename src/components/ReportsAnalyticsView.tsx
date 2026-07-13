@@ -281,27 +281,44 @@ export const ReportsAnalyticsView: React.FC<ReportsAnalyticsViewProps> = ({
 
         <div className="col-span-12 lg:col-span-4 bg-white p-5 rounded-sm border border-[#1a42310d] space-y-4">
           <div className="pb-3 border-b border-[#1a42310d]">
-            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Resolution Index by Sector</h3>
-            <p className="text-[10px] text-slate-400 mt-0.5">District governance resolution tracking metrics</p>
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Attendance Index by Sector</h3>
+            <p className="text-[10px] text-slate-400 mt-0.5">District governance attendance tracking metrics</p>
           </div>
 
           <div className="space-y-4 pt-1">
-            {[
-              { label: 'Gasabo Sector Index', value: 94.2, color: '#1a4231' },
-              { label: 'Kicukiro Sector Index', value: 88.0, color: '#1a4231' },
-              { label: 'Nyarugenge Sector Index', value: 75.1, color: '#f59e0b' },
-              { label: 'Remera Sector Index', value: 92.0, color: '#1a4231' },
-            ].map(({ label, value, color }) => (
-              <div key={label} className="space-y-1.5">
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-600 font-bold">{label}</span>
-                  <span className="font-extrabold" style={{ color }}>{value}%</span>
+            {(() => {
+              // Group meetings by sector and compute attendance rate
+              const sectorMap: Record<string, { participants: number; target: number }> = {};
+              meetings.forEach((m) => {
+                const key = m.sector || 'Unknown';
+                if (!sectorMap[key]) sectorMap[key] = { participants: 0, target: 0 };
+                sectorMap[key].participants += m.participants ?? 0;
+                sectorMap[key].target += m.targetCount ?? 0;
+              });
+              const sectorRows = Object.entries(sectorMap)
+                .map(([label, { participants, target }]) => ({
+                  label: `${label} Index`,
+                  value: target > 0 ? Math.round((participants / target) * 1000) / 10 : 0,
+                }))
+                .sort((a, b) => b.value - a.value)
+                .slice(0, 4);
+
+              if (sectorRows.length === 0) {
+                return <p className="text-xs text-slate-400 text-center py-4">No sector data available.</p>;
+              }
+
+              return sectorRows.map(({ label, value }) => (
+                <div key={label} className="space-y-1.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-600 font-bold">{label}</span>
+                    <span className={`font-extrabold ${value >= 80 ? 'text-[#1a4231]' : 'text-amber-600'}`}>{value}%</span>
+                  </div>
+                  <div className="w-full bg-[#1a423107] h-1.5 rounded-sm overflow-hidden">
+                    <div className="h-full bg-[#1a4231]" style={{ width: `${Math.min(value, 100)}%` }}></div>
+                  </div>
                 </div>
-                <div className="w-full bg-[#1a423107] h-1.5 rounded-sm overflow-hidden">
-                  <div className="h-full" style={{ width: `${value}%`, background: color }}></div>
-                </div>
-              </div>
-            ))}
+              ));
+            })()}
           </div>
 
           <div className="pt-4 border-t border-slate-100 flex items-center gap-2 text-[9px] text-slate-400">

@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { 
   Plus, Search, AlertTriangle, CheckCircle2, RotateCw, Filter, 
   ChevronDown, ArrowUpRight, ShieldAlert, Edit2, Eye, MapPin, 
-  Calendar, Check, FileDown, MoreVertical, Bookmark
+  Calendar, Check, FileDown, MoreVertical, Bookmark, X
 } from 'lucide-react';
 import { User, CitizenIssue } from '../types';
 
@@ -16,6 +16,8 @@ interface IssueTrackingViewProps {
   issues: any[];
   onTriggerEditIssue: (issueId: string) => void;
   onTriggerViewIssue?: (issueId: string) => void;
+  onCreateIssue?: (data: { title: string; description: string; category: string; reporterName: string; reporterPhone: string }) => void;
+  onResolveIssue?: (issueId: string) => void;
   onNavigateToView: (view: string) => void;
 }
 
@@ -24,12 +26,22 @@ export const IssueTrackingView: React.FC<IssueTrackingViewProps> = ({
   issues,
   onTriggerEditIssue,
   onTriggerViewIssue,
+  onCreateIssue,
+  onResolveIssue,
   onNavigateToView
 }) => {
   const [searchParam, setSearchParam] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
   const [priorityFilter, setPriorityFilter] = useState('All');
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  // Create form fields
+  const [newTitle, setNewTitle] = useState('');
+  const [newDesc, setNewDesc] = useState('');
+  const [newCategory, setNewCategory] = useState('Infrastructure');
+  const [newReporter, setNewReporter] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [createError, setCreateError] = useState('');
 
   const isSecretary = currentUser.role === 'Meeting Secretary';
 
@@ -94,8 +106,84 @@ export const IssueTrackingView: React.FC<IssueTrackingViewProps> = ({
               <span>Log Issue via Meeting</span>
             </button>
           )}
+          {!isSecretary && onCreateIssue && (
+            <button
+              onClick={() => setShowCreateForm(v => !v)}
+              className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-[#1a4231] hover:bg-[#1a2d21] text-white text-[11px] font-bold tracking-wider rounded-sm uppercase transition-all shadow-sm cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>{showCreateForm ? 'Cancel' : 'New Issue'}</span>
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Create Issue Form — Sector Official only */}
+      {showCreateForm && !isSecretary && onCreateIssue && (
+        <div className="bg-white p-5 rounded-sm border border-[#1a423126] shadow-xs space-y-4 max-w-2xl">
+          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-tight border-b border-slate-100 pb-2">Register New Citizen Issue</h3>
+          {createError && (
+            <p className="text-[10px] font-bold text-red-700 bg-red-50 p-2 border-l-[3px] border-red-500 rounded-xs">{createError}</p>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="sm:col-span-2">
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Issue Title *</label>
+              <input type="text" value={newTitle} onChange={e => setNewTitle(e.target.value)}
+                placeholder="e.g. Road repair needed on main street"
+                className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-sm focus:outline-none focus:border-[#1a4231]" />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Description</label>
+              <textarea value={newDesc} onChange={e => setNewDesc(e.target.value)} rows={2}
+                placeholder="Describe the issue in detail..."
+                className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-sm focus:outline-none focus:border-[#1a4231] resize-none" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Category</label>
+              <select value={newCategory} onChange={e => setNewCategory(e.target.value)}
+                className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-sm focus:outline-none focus:border-[#1a4231]">
+                <option>Infrastructure</option>
+                <option>Land</option>
+                <option>Governance</option>
+                <option>Social</option>
+                <option>Economic</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Reporter Name *</label>
+              <input type="text" value={newReporter} onChange={e => setNewReporter(e.target.value)}
+                placeholder="Citizen full name"
+                className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-sm focus:outline-none focus:border-[#1a4231]" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Reporter Phone</label>
+              <input type="text" value={newPhone} onChange={e => setNewPhone(e.target.value)}
+                placeholder="+250 788 ..."
+                className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-sm focus:outline-none focus:border-[#1a4231]" />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-1 border-t border-slate-100">
+            <button onClick={() => { setShowCreateForm(false); setCreateError(''); }}
+              className="px-3 py-1.5 border border-slate-200 text-slate-600 hover:bg-slate-50 text-[10px] font-bold uppercase rounded-sm cursor-pointer">
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                if (!newTitle.trim() || !newReporter.trim()) {
+                  setCreateError('Title and Reporter Name are required.');
+                  return;
+                }
+                onCreateIssue({ title: newTitle.trim(), description: newDesc.trim(), category: newCategory, reporterName: newReporter.trim(), reporterPhone: newPhone.trim() });
+                setNewTitle(''); setNewDesc(''); setNewReporter(''); setNewPhone(''); setNewCategory('Infrastructure');
+                setCreateError('');
+                setShowCreateForm(false);
+              }}
+              className="px-4 py-1.5 bg-[#1a4231] hover:bg-[#1a2d21] text-white text-[10px] font-bold uppercase rounded-sm cursor-pointer">
+              Submit Issue
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* KPI Cards Panel */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -301,6 +389,15 @@ export const IssueTrackingView: React.FC<IssueTrackingViewProps> = ({
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex justify-end gap-1.5">
+                        {!isSecretary && onResolveIssue && issue.status !== 'Resolved' && issue.status !== 'Success' && (
+                          <button
+                            onClick={() => onResolveIssue(issue.id)}
+                            className="p-1 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-sm cursor-pointer transition-colors"
+                            title="Mark as Resolved"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         {isSecretary && (
                           <button
                             onClick={() => onTriggerEditIssue(issue.id)}

@@ -6,7 +6,7 @@
 import React from 'react';
 import { 
   Users, Calendar, AlertTriangle, CheckCircle2, ArrowUpRight, 
-  Clock, ShieldAlert, Sparkles, Plus, FileSpreadsheet, LayoutList, Check, RotateCw 
+  Clock, ShieldAlert, LayoutList, Check, RotateCw, Plus
 } from 'lucide-react';
 import { User, Meeting, CitizenIssue } from '../types';
 
@@ -18,7 +18,6 @@ interface DashboardViewProps {
   onCreateMeetingTrigger: () => void;
   onCreateUserTrigger: () => void;
   onNavigateToView: (view: string) => void;
-  onAddSimulatedIssue: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -29,7 +28,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onCreateMeetingTrigger,
   onCreateUserTrigger,
   onNavigateToView,
-  onAddSimulatedIssue
 }) => {
   const totalUsersCount = users.length;
   const activeUsersCount = users.filter(u => u.status === 'Active').length;
@@ -66,13 +64,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         <div className="relative z-10 mt-4 md:mt-0 flex gap-2 w-full md:w-auto shrink-0">
-          <button 
-            onClick={onAddSimulatedIssue}
-            className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-[#10b981] hover:bg-[#059669] text-white text-[11px] font-bold tracking-wider rounded-sm uppercase transition-colors shadow-sm cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Simulate Issue</span>
-          </button>
           <button 
             onClick={onCreateMeetingTrigger}
             className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white text-[#1a4231] hover:bg-emerald-50 text-[11px] font-bold tracking-wider rounded-sm uppercase transition-colors shadow-md cursor-pointer border border-[#1a42311a]"
@@ -129,7 +120,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="flex items-start justify-between">
             <div className="space-y-1">
               <span className="text-[10px] tracking-wider text-slate-500 uppercase font-bold">Citizen Issues Logged</span>
-              <p className="text-2xl font-extrabold tracking-tight text-slate-800">{issues.length + 214}</p>
+              <p className="text-2xl font-extrabold tracking-tight text-slate-800">{issues.length}</p>
             </div>
             <div className="p-2 bg-amber-50 text-amber-700 rounded-sm">
               <AlertTriangle className="w-4 h-4" />
@@ -137,7 +128,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div className="mt-4 pt-3 border-t border-[#1a423105] flex items-center justify-between text-[11px]">
             <span className="text-amber-800 bg-amber-50/80 px-1.5 py-0.5 rounded-sm font-bold flex items-center gap-1 text-[10px]">
-              <ShieldAlert className="w-3 h-3 text-amber-600" /> 4 Critical Escalations
+              <ShieldAlert className="w-3 h-3 text-amber-600" /> {issues.filter(i => i.status === 'Active').length} Active
             </span>
             <span className="text-slate-500 text-[10px]">Real-time queue</span>
           </div>
@@ -149,7 +140,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="space-y-1">
               <span className="text-[10px] tracking-wider text-slate-500 uppercase font-bold">Issue Resolution Rate</span>
               <p className="text-2xl font-extrabold tracking-tight text-slate-800">
-                {Math.round(((issues.filter(i => i.status === 'Resolved' || i.status === 'Success').length + 85) / (issues.length + 214)) * 100)}%
+                {issues.length > 0
+                  ? Math.round((issues.filter(i => i.status === 'Resolved' || i.status === 'Success').length / issues.length) * 100)
+                  : 0}%
               </p>
             </div>
             <div className="p-2 bg-emerald-50 text-emerald-700 rounded-sm">
@@ -158,11 +151,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div className="mt-4 pt-3 border-t border-[#1a423105] space-y-1">
             <div className="flex justify-between text-[10px] text-slate-500 font-medium">
-              <span>85 Resolved</span>
-              <span>133 Processing</span>
+              <span>{issues.filter(i => i.status === 'Resolved' || i.status === 'Success').length} Resolved</span>
+              <span>{issues.filter(i => i.status === 'Processing').length} Processing</span>
             </div>
             <div className="w-full bg-[#1a42310d] h-1.5 rounded-full overflow-hidden">
-              <div className="bg-[#1a4231] h-full" style={{ width: '64%' }}></div>
+              <div className="bg-[#1a4231] h-full" style={{ width: `${issues.length > 0 ? Math.round((issues.filter(i => i.status === 'Resolved' || i.status === 'Success').length / issues.length) * 100) : 0}%` }}></div>
             </div>
           </div>
         </div>
@@ -176,78 +169,36 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="col-span-12 lg:col-span-5 bg-white p-5 rounded-sm border border-[#1a42310d] space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[#1a42310d]">
             <div>
-              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Citizen Issues by Sector Sector</h3>
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Citizen Issues by Category</h3>
               <p className="text-[10px] text-slate-400 mt-0.5">Summary breakdown of local constituent request tickets</p>
             </div>
             <span className="text-[10px] bg-[#1a42310a] text-[#1a4231] px-2 py-0.5 rounded-sm font-semibold">Active</span>
           </div>
 
           <div className="space-y-3.5 pt-1">
-            {/* Category Items */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-600 font-medium flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 bg-[#1a4231] rounded-xs inline-block"></span> Infrastructure
-                </span>
-                <span className="font-bold text-slate-800">78 Issues <span className="text-slate-400 font-normal text-[10px]">(35%)</span></span>
-              </div>
-              <div className="w-full bg-[#1a423108] h-2 rounded-xs overflow-hidden">
-                <div className="bg-[#1a4231] h-full" style={{ width: '35%' }}></div>
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-600 font-medium flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 bg-[#10b981] rounded-xs inline-block"></span> Governance Oversight
-                </span>
-                <span className="font-bold text-slate-800">54 Issues <span className="text-slate-400 font-normal text-[10px]">(25%)</span></span>
-              </div>
-              <div className="w-full bg-[#1a423108] h-2 rounded-xs overflow-hidden">
-                <div className="bg-[#10b981] h-full" style={{ width: '25%' }}></div>
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-600 font-medium flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 bg-amber-500 rounded-xs inline-block"></span> Social Welfare
-                </span>
-                <span className="font-bold text-slate-800">42 Issues <span className="text-slate-400 font-normal text-[10px]">(19%)</span></span>
-              </div>
-              <div className="w-full bg-[#1a423108] h-2 rounded-xs overflow-hidden">
-                <div className="bg-amber-500 h-full" style={{ width: '19%' }}></div>
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-600 font-medium flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 bg-blue-500 rounded-xs inline-block"></span> Economic & Trade
-                </span>
-                <span className="font-bold text-slate-800">31 Issues <span className="text-slate-400 font-normal text-[10px]">(14%)</span></span>
-              </div>
-              <div className="w-full bg-[#1a423108] h-2 rounded-xs overflow-hidden">
-                <div className="bg-blue-500 h-full" style={{ width: '14%' }}></div>
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-600 font-medium flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 bg-purple-500 rounded-xs inline-block"></span> Land Disputes
-                </span>
-                <span className="font-bold text-slate-800">13 Issues <span className="text-slate-400 font-normal text-[10px]">(7%)</span></span>
-              </div>
-              <div className="w-full bg-[#1a423108] h-2 rounded-xs overflow-hidden">
-                <div className="bg-purple-500 h-full" style={{ width: '7%' }}></div>
-              </div>
-            </div>
+            {(['Infrastructure', 'Governance', 'Social', 'Economic', 'Land'] as const).map((cat, idx) => {
+              const colors = ['#1a4231', '#10b981', '#f59e0b', '#3b82f6', '#a855f7'];
+              const count = issues.filter(i => i.category === cat).length;
+              const pct = issues.length > 0 ? Math.round((count / issues.length) * 100) : 0;
+              return (
+                <div key={cat} className="space-y-1.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-600 font-medium flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-xs inline-block" style={{ background: colors[idx] }}></span>
+                      {cat}
+                    </span>
+                    <span className="font-bold text-slate-800">{count} Issues <span className="text-slate-400 font-normal text-[10px]">({pct}%)</span></span>
+                  </div>
+                  <div className="w-full bg-[#1a423108] h-2 rounded-xs overflow-hidden">
+                    <div className="h-full" style={{ width: `${pct}%`, background: colors[idx] }}></div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
-          {/* Quick-toggle action to explore full analytical graphs */}
           <div className="pt-2">
-            <button 
+            <button
               onClick={() => onNavigateToView('Reports & Analytics')}
               className="w-full py-1.5 bg-[#1a42310d] hover:bg-[#1a423114] text-[#1a4231] font-bold text-[10px] uppercase tracking-wider rounded-sm transition-colors text-center cursor-pointer block"
             >

@@ -3,14 +3,32 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  FileText, Search, Upload, Download, Eye, Folder, FolderOpen, Filter, 
-  Trash2, Plus, ShieldCheck, Database, Calendar, Tag, ChevronRight, X, Info
+  FileText, Search, Upload, Download, Eye, Folder, FolderOpen,
+  Trash2, ShieldCheck, Database, Calendar, X, Check
 } from 'lucide-react';
 import { User } from '../types';
+import { fetchDocuments } from '../api';
+
+// Stored file blobs for uploaded documents (in-memory during session)
+const uploadedBlobs: Record<string, Blob> = {};
 
 const downloadDocumentFile = (doc: DocumentFile) => {
+  // If the user uploaded this file this session, serve the real blob
+  if (uploadedBlobs[doc.id]) {
+    const url = URL.createObjectURL(uploadedBlobs[doc.id]);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = doc.name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    return;
+  }
+
+  // For backend-loaded documents: generate a text summary (no real file stored)
   const content = [
     `INTEKO Y'ABATURAGE — OFFICIAL DOCUMENT VAULT`,
     `==============================================`,
@@ -35,11 +53,11 @@ const downloadDocumentFile = (doc: DocumentFile) => {
     `Generated: ${new Date().toLocaleString()}`,
   ].join('\n');
 
-  const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
+  const blob = new Blob([content], { type: 'application/octet-stream' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = doc.name.replace(/\.pdf$/i, '.txt');
+  link.download = doc.name;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -67,72 +85,36 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({ curren
   const [viewingDoc, setViewingDoc] = useState<DocumentFile | null>(null);
   const [uploadedDocsCount, setUploadedDocsCount] = useState(0);
   const [dragging, setDragging] = useState(false);
-  const [uploadFileName, setUploadFileName] = useState('');
+  const [documentFiles, setDocumentFiles] = useState<DocumentFile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [toastMsg, setToastMsg] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null); // doc.id to delete
 
-  const initialDocs: DocumentFile[] = [
-    {
-      id: "DOC-2023-V4",
-      name: "National Citizen Assembly Guidelines (LOB-2023-V4).pdf",
-      category: "Policy",
-      size: "4.2 MB",
-      version: "4.0.2",
-      dateModified: "Oct 24, 2023",
-      authorAgency: "Ministry of Local Government (MINALOC)",
-      contentSummary: "This official policy directive sets the organizational and legal framework for the planning, execution, and monitoring of citizen assemblies (Inteko y'Abaturage) across all districts of the Republic of Rwanda. Standardizes agendas and records security protocols."
-    },
-    {
-      id: "DOC-TEMP-023",
-      name: "Official Attendance Record Sheet Standard Template.pdf",
-      category: "Standard Form",
-      size: "1.1 MB",
-      version: "1.3",
-      dateModified: "Sep 12, 2023",
-      authorAgency: "National IT Development Agency (RISA)",
-      contentSummary: "Universal administrative printable record sheet that local Meeting Secretaries are required to populate with participant signatures. Contains fields for National ID Number, phone number, and village affiliation."
-    },
-    {
-      id: "DOC-POLICY-012",
-      name: "Registry of Claims Escalation Policy Guidelines.pdf",
-      category: "Policy",
-      size: "2.8 MB",
-      version: "2.0",
-      dateModified: "Oct 18, 2023",
-      authorAgency: "Ministry of Justice (MINIJUST)",
-      contentSummary: "Comprehensive process maps outlining legal and administrative paths of citizen land, social welfare, or economic claims logged during physical assemblies. Details deadlines and responsible office structures."
-    },
-    {
-      id: "DOC-SECURE-005",
-      name: "Sector Security & Dispute Resolution Directives.pdf",
-      category: "Policy",
-      size: "3.5 MB",
-      version: "1.1.5",
-      dateModified: "Jul 05, 2023",
-      authorAgency: "Rwanda National Police (RNP) Coordination",
-      contentSummary: "Security liaison manuals detailing standard operational procedures for resolving high importance border overlaps or environmental enforcement issues through community consensus and official arbitration boards."
-    },
-    {
-      id: "DOC-ANNUAL-Q3",
-      name: "Central District Q3 Assembly Performance Audit.pdf",
-      category: "Report",
-      size: "8.9 MB",
-      version: "1.0",
-      dateModified: "Oct 01, 2023",
-      authorAgency: "Sector Executive Council Board",
-      contentSummary: "Full statistical performance audit representing Q3 activities. Includes citizen attendance rate breakdowns, resolution completion ratios, and lists of outstanding village infrastructure repair milestones."
-    },
-    {
-      id: "DOC-GUIDE-SEC",
-      name: "Meeting Secretary Training Manual & Quick Guide.pdf",
-      category: "Guide",
-      size: "5.4 MB",
-      version: "3.2.1",
-      dateModified: "Aug 29, 2023",
-      authorAgency: "Ministry of Local Government (MINALOC)",
-      contentSummary: "Operational step-by-step guidance manuals designed specifically for Meeting Secretaries. Outlines step-by-step instructions on utilizing single-session local states, scheduling meetings, and logging claims correctly."
-    }
-  ];
+  const showDocToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(''), 3500);
+  };
 
-  const [documentFiles, setDocumentFiles] = useState<DocumentFile[]>(initialDocs);
+  // Load documents from backend on mount; fall back to empty list
+  useEffect(() => {
+    fetchDocuments()
+      .then((backendDocs) => {
+        const mapped: DocumentFile[] = backendDocs.map((d) => ({
+          id: d.documentCode ?? String(d.id),
+          name: d.fileName ?? d.title,
+          category: (['Policy', 'Report', 'Standard Form', 'Guide'].includes(d.category)
+            ? d.category : 'Policy') as DocumentFile['category'],
+          size: d.fileSize ? `${(d.fileSize / (1024 * 1024)).toFixed(1)} MB` : '—',
+          version: '1.0',
+          dateModified: d.createdAt ? new Date(d.createdAt).toLocaleDateString() : '—',
+          authorAgency: 'Ministry of Local Government (MINALOC)',
+          contentSummary: d.description ?? '',
+        }));
+        setDocumentFiles(mapped);
+      })
+      .catch(() => setDocumentFiles([]))
+      .finally(() => setLoading(false));
+  }, []);
 
   const filteredDocs = documentFiles.filter(doc => {
     const matchesSearch = doc.name.toLowerCase().includes(searchParam.toLowerCase()) || 
@@ -147,8 +129,9 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({ curren
   const handleManualUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
+      const docId = `DOC-NEW-0${documentFiles.length + 1}`;
       const newDoc: DocumentFile = {
-        id: `DOC-NEW-0${documentFiles.length + 1}`,
+        id: docId,
         name: file.name,
         category: "Policy",
         size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
@@ -157,9 +140,11 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({ curren
         authorAgency: `${currentUser.role || 'Staff Representative'} Uploads`,
         contentSummary: "Citizen uploaded supporting evidence document relating to regional assembly agenda items. Validated under ERP protocol."
       };
+      // Store the real file blob so download works correctly
+      uploadedBlobs[docId] = file;
       setDocumentFiles(prev => [newDoc, ...prev]);
       setUploadedDocsCount(c => c + 1);
-      alert(`Document uploaded and committed: "${file.name}" was safely stored in the document vault.`);
+      showDocToast(`"${file.name}" uploaded and ready for download.`);
     }
   };
 
@@ -177,8 +162,9 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({ curren
     setDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const file = e.dataTransfer.files[0];
+      const docId = `DOC-NEW-0${documentFiles.length + 1}`;
       const newDoc: DocumentFile = {
-        id: `DOC-NEW-0${documentFiles.length + 1}`,
+        id: docId,
         name: file.name,
         category: "Report",
         size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
@@ -187,9 +173,11 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({ curren
         authorAgency: `${currentUser.role || 'Staff Representative'} Uploads`,
         contentSummary: "Citizen uploaded supporting evidence document relating to regional assembly agenda items. Validated under ERP protocol."
       };
+      // Store the real file blob so download works correctly
+      uploadedBlobs[docId] = file;
       setDocumentFiles(prev => [newDoc, ...prev]);
       setUploadedDocsCount(c => c + 1);
-      alert(`Document uploaded and committed: "${file.name}" was safely stored in the document vault.`);
+      showDocToast(`"${file.name}" uploaded and ready for download.`);
     }
   };
 
@@ -218,8 +206,7 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({ curren
             <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">Total File Index</span>
             <p className="text-xl font-extrabold text-slate-800 font-sans tracking-tight">{documentFiles.length} Documents</p>
             <p className="text-[10px] text-emerald-700 font-semibold mt-0.5">MINALOC verified repositories</p>
-          </div>
-          <div className="p-2 bg-[#1a423108] text-[#1a4231] rounded-sm">
+          </div>          <div className="p-2 bg-[#1a423108] text-[#1a4231] rounded-sm">
             <Database className="w-4 h-4" />
           </div>
         </div>
@@ -363,7 +350,13 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({ curren
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs text-slate-750">
-                  {filteredDocs.length === 0 ? (
+                  {loading ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-xs text-slate-400">
+                        Loading documents…
+                      </td>
+                    </tr>
+                  ) : filteredDocs.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="py-8 text-center text-slate-400">
                         <FileText className="w-6 h-6 text-slate-300 mx-auto mb-2" />
@@ -403,11 +396,7 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({ curren
                               <Eye className="w-3.5 h-3.5" />
                             </button>
                             <button
-                              onClick={() => {
-                                if (window.confirm(`Revoke document registration state and remove document file permanently from library records?`)) {
-                                  setDocumentFiles(prev => prev.filter(d => d.id !== doc.id));
-                                }
-                              }}
+                              onClick={() => setConfirmDelete(doc.id)}
                               className="p-1 text-slate-400 hover:text-red-650 hover:bg-slate-100 rounded-sm cursor-pointer transition-colors"
                               title="Revoke and delete record"
                             >
@@ -428,8 +417,7 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({ curren
       </div>
 
       {/* Document View Modal Dialog */}
-      {viewingDoc && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+      {viewingDoc && (        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white border border-[#1a423126] rounded-sm shadow-md max-w-2xl w-full overflow-hidden select-none">
             
             {/* Modal Title bar */}
@@ -512,6 +500,46 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({ curren
             </div>
 
           </div>
+        </div>
+      )}
+
+      {/* Confirm delete dialog */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-sm shadow-xl border border-[#1a423126] max-w-sm w-full p-6 space-y-4">
+            <p className="text-xs font-bold text-slate-800 leading-relaxed">
+              Revoke document registration and remove this file permanently from library records?
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="px-4 py-1.5 border border-slate-200 text-slate-600 hover:bg-slate-50 text-[10px] font-bold uppercase rounded-sm cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (confirmDelete) {
+                    delete uploadedBlobs[confirmDelete];
+                    setDocumentFiles(prev => prev.filter(d => d.id !== confirmDelete));
+                    showDocToast('Document removed from library.');
+                  }
+                  setConfirmDelete(null);
+                }}
+                className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold uppercase rounded-sm cursor-pointer"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inline toast */}
+      {toastMsg && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-sm shadow-lg text-xs font-bold flex items-center gap-2 bg-[#1a4231] text-white border border-emerald-600">
+          <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+          {toastMsg}
         </div>
       )}
 

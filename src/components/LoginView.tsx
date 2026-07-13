@@ -6,26 +6,31 @@
 import React, { useState } from 'react';
 import { Shield, Lock, Mail, ChevronRight, Eye, EyeOff, Loader } from 'lucide-react';
 import { User } from '../types';
-
 interface LoginViewProps {
   onLoginSuccess: (user: Partial<User>) => void;
-  availableUsers: User[];
 }
 
 const API_BASE = 'http://localhost:8080/api/v1';
 
-export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, availableUsers }) => {
+export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const ROLES = ['Administrator', 'Sector Official', 'Meeting Secretary'] as const;
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
       setError('Please enter your official email address.');
+      return;
+    }
+    if (!selectedRole) {
+      setError('Please select your account role before authenticating.');
       return;
     }
     setLoading(true);
@@ -62,75 +67,24 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, availableU
           avatar: backendUser.avatar ?? '',
           position: backendUser.position ?? '',
         };
+        if (mappedUser.role !== selectedRole) {
+          setError('Selected role does not match your account. Please select the correct role for this account.');
+          return;
+        }
         onLoginSuccess(mappedUser);
         return;
       } else if (res.status === 401) {
         setError('Invalid email or password.');
         return;
       }
-      // Non-401 error — fall through to local fallback
+      // Non-401 error (e.g. 500) — show generic error
+      setError('Login service unavailable. Please try again.');
+      return;
     } catch {
-      // Backend unreachable — fall through to local login
+      setError('Cannot reach server. Please check your connection.');
     } finally {
       setLoading(false);
     }
-
-    // Local fallback (dev / backend down)
-    const userMatched = availableUsers.find(
-      u => u.email.toLowerCase() === email.trim().toLowerCase()
-    );
-    if (userMatched) {
-      onLoginSuccess(userMatched);
-    } else {
-      setError('Account not found. Check your email address.');
-    }
-  };
-
-  const handleQuickLogin = async (user: User) => {
-    setEmail(user.email);
-    setPassword('password123');
-    setLoading(true);
-    setError('');
-
-    try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: user.email, password: 'password123' }),
-      });
-
-      if (res.ok) {
-        const json = await res.json();
-        const data = json.data;
-        localStorage.setItem('inteko_jwt_token', data.accessToken);
-        const bu = data.user;
-        const roleMap: Record<string, string> = {
-          ADMINISTRATOR: 'Administrator',
-          SECTOR_OFFICIAL: 'Sector Official',
-          MEETING_SECRETARY: 'Meeting Secretary',
-        };
-        const mappedUser: Partial<User> = {
-          id: String(bu.id),
-          name: bu.name ?? bu.fullName ?? user.name,
-          email: bu.email,
-          role: (roleMap[bu.role] ?? bu.role) as User['role'],
-          status: 'Active',
-          sector: bu.sectorName ?? bu.sector ?? user.sector,
-          cell: bu.cellName ?? bu.cell ?? user.cell,
-          village: bu.villageName ?? bu.village ?? user.village,
-          avatar: user.avatar,
-          position: bu.position ?? user.position,
-        };
-        onLoginSuccess(mappedUser);
-        return;
-      }
-    } catch {
-      // Backend unreachable — fall back to local
-    } finally {
-      setLoading(false);
-    }
-
-    onLoginSuccess(user);
   };
 
   return (
@@ -262,6 +216,29 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, availableU
                 </label>
               </div>
 
+              {/* Role Selector */}
+              <div>
+                <label className="block text-[10px] font-bold tracking-wider text-slate-700 uppercase mb-2">
+                  Select Your Role
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {ROLES.map((role) => (
+                    <button
+                      key={role}
+                      type="button"
+                      onClick={() => { setSelectedRole(role); setError(''); }}
+                      className={`py-2 px-2 text-[10px] font-bold rounded-sm border transition-colors text-center leading-tight ${
+                        selectedRole === role
+                          ? 'bg-[#1a4231] text-white border-[#1a4231]'
+                          : 'bg-white text-slate-600 border-slate-200 hover:border-[#1a4231] hover:text-[#1a4231]'
+                      }`}
+                    >
+                      {role}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <button
                 type="submit"
                 disabled={loading}
@@ -272,25 +249,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, availableU
               </button>
             </form>
 
-            {/* Quick Login Role Demo Accounts Swappable List */}
-            <div className="mt-8 pt-6 border-t border-[#1a42310d]">
-              <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-3 block">
-                Administrative Quick-Access (Testing Simulation)
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {availableUsers.map((u) => (
-                  <button
-                    key={u.id}
-                    onClick={() => handleQuickLogin(u)}
-                    className="p-2 border border-slate-100 hover:border-[#1a423133] hover:bg-[#1a423105] text-left rounded-sm transition-all focus:outline-none focus:ring-1 focus:ring-[#1a4231]"
-                  >
-                    <p className="text-[11px] font-bold text-slate-700 truncate">{u.name}</p>
-                    <p className="text-[9px] text-[#1a4231] font-semibold tracking-tight">{u.role}</p>
-                    <p className="text-[8px] text-slate-400 truncate font-mono">{u.email}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
       </div>

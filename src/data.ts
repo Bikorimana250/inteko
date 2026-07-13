@@ -129,51 +129,64 @@ export const INITIAL_MEETINGS: Meeting[] = [
   }
 ];
 
-// Cells and Villages
+// Cells and Villages — matches V3__seed_data.sql geographic seed data
 export const INITIAL_CELLS: CivilCell[] = [
   {
-    id: 'C-01',
-    name: 'Kacyiru Cell',
-    sector: 'Gasabo',
+    id: 'C-001',
+    name: 'Kamukina Cell',
+    sector: 'Kinyinya',
     villages: [
-      { id: 'V-01', name: 'Umutekano Village', cellId: 'C-01', leader: 'Jean Damascene M.', population: 1240, leaderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100' },
-      { id: 'V-02', name: 'Amahoro Village', cellId: 'C-01', leader: 'Marie Claire U.', population: 980, leaderAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100' },
-      { id: 'V-03', name: 'Gukunda Village', cellId: 'C-01', leader: 'Paul Ntaganda', population: 1502, leaderAvatar: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=100' },
-      { id: 'V-04', name: 'Inshuti Village', cellId: 'C-01', leader: 'Alice Mutoni', population: 845, leaderAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100' }
+      { id: 'V-001', name: 'Agatare', cellId: 'C-001', leader: 'Jean Baptiste Mukama', population: 450, leaderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100' },
+      { id: 'V-002', name: 'Kabuye', cellId: 'C-001', leader: 'Marie Claire Uwera', population: 520, leaderAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100' },
+      { id: 'V-003', name: 'Rugarama', cellId: 'C-001', leader: 'Emmanuel Niyonzima', population: 380, leaderAvatar: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=100' }
     ]
   },
   {
-    id: 'C-02',
-    name: 'Kimihurura Cell',
-    sector: 'Gasabo',
+    id: 'C-002',
+    name: 'Nyagahinga Cell',
+    sector: 'Kinyinya',
     villages: [
-      { id: 'V-05', name: 'Umuganda Village', cellId: 'C-02', leader: 'Felicien K.', population: 1100, leaderAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100' },
-      { id: 'V-06', name: 'Iterambere Village', cellId: 'C-02', leader: 'Grace I.', population: 1400, leaderAvatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100' }
+      { id: 'V-004', name: 'Gahanga', cellId: 'C-002', leader: 'Grace Mukeshimana', population: 410, leaderAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100' },
+      { id: 'V-005', name: 'Kimisagara', cellId: 'C-002', leader: 'Patrick Habimana', population: 495, leaderAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100' }
     ]
   },
   {
-    id: 'C-03',
-    name: 'Remera Cell',
-    sector: 'Gasabo',
+    id: 'C-003',
+    name: 'Rukiri Cell',
+    sector: 'Kinyinya',
     villages: [
-      { id: 'V-07', name: 'Urugero Village', cellId: 'C-03', leader: 'Augustin N.', population: 2050, leaderAvatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100' }
+      { id: 'V-006', name: 'Nyamirambo', cellId: 'C-003', leader: 'Alice Uwimana', population: 560, leaderAvatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100' },
+      { id: 'V-007', name: 'Kabeza', cellId: 'C-003', leader: 'Joseph Kalisa', population: 430, leaderAvatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100' }
     ]
   },
   {
-    id: 'C-04',
-    name: 'Nyarutarama Cell',
-    sector: 'Gasabo',
+    id: 'C-004',
+    name: 'Nyabisindu Cell',
+    sector: 'Remera',
     villages: [
-      { id: 'V-08', name: 'Kano Village', cellId: 'C-04', leader: 'Jean de Dieu M.', population: 1800, leaderAvatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=100' }
+      { id: 'V-008', name: 'Kacyiru', cellId: 'C-004', leader: 'Christine Mukamazimpaka', population: 620, leaderAvatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=100' },
+      { id: 'V-009', name: 'Kimihurura', cellId: 'C-004', leader: 'David Mugisha', population: 580, leaderAvatar: 'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=100' }
     ]
   },
   {
-    id: 'C-05',
-    name: 'Gisozi Cell',
-    sector: 'Gasabo',
+    id: 'C-005',
+    name: 'Kisimenti Cell',
+    sector: 'Remera',
     villages: [
-      { id: 'V-09', name: 'Musezero Village', cellId: 'C-05', leader: 'Safi T.', population: 1350, leaderAvatar: 'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=100' }
+      { id: 'V-010', name: 'Gikondo', cellId: 'C-005', leader: 'Sarah Uwamahoro', population: 490, leaderAvatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100' }
     ]
+  },
+  {
+    id: 'C-006',
+    name: 'Kibagabaga Cell',
+    sector: 'Kimironko',
+    villages: []
+  },
+  {
+    id: 'C-007',
+    name: 'Bibare Cell',
+    sector: 'Kimironko',
+    villages: []
   }
 ];
 

@@ -18,12 +18,12 @@ import java.util.List;
 @RequestMapping("/resolutions")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
-@PreAuthorize("hasAnyRole('SECTOR_OFFICIAL', 'MEETING_SECRETARY', 'ADMINISTRATOR')")
 public class ResolutionController {
     
     private final ResolutionService resolutionService;
     
     @PostMapping
+    @PreAuthorize("hasRole('SECTOR_OFFICIAL')")
     public ResponseEntity<ApiResponse<ResolutionResponse>> createResolution(
             @Valid @RequestBody CreateResolutionRequest request) {
         ResolutionResponse resolution = resolutionService.createResolution(request);
@@ -33,18 +33,21 @@ public class ResolutionController {
     }
     
     @GetMapping
+    @PreAuthorize("hasAnyRole('SECTOR_OFFICIAL', 'MEETING_SECRETARY', 'ADMINISTRATOR')")
     public ResponseEntity<ApiResponse<List<ResolutionResponse>>> getAllResolutions() {
         List<ResolutionResponse> resolutions = resolutionService.getAllResolutions();
         return ResponseEntity.ok(ApiResponse.success(resolutions));
     }
     
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('SECTOR_OFFICIAL', 'MEETING_SECRETARY', 'ADMINISTRATOR')")
     public ResponseEntity<ApiResponse<ResolutionResponse>> getResolutionById(@PathVariable Long id) {
         ResolutionResponse resolution = resolutionService.getResolutionById(id);
         return ResponseEntity.ok(ApiResponse.success(resolution));
     }
     
     @GetMapping("/status/{status}")
+    @PreAuthorize("hasAnyRole('SECTOR_OFFICIAL', 'MEETING_SECRETARY', 'ADMINISTRATOR')")
     public ResponseEntity<ApiResponse<List<ResolutionResponse>>> getResolutionsByStatus(
             @PathVariable ResolutionStatus status) {
         List<ResolutionResponse> resolutions = resolutionService.getResolutionsByStatus(status);
@@ -52,12 +55,14 @@ public class ResolutionController {
     }
     
     @GetMapping("/overdue")
+    @PreAuthorize("hasAnyRole('SECTOR_OFFICIAL', 'ADMINISTRATOR')")
     public ResponseEntity<ApiResponse<List<ResolutionResponse>>> getOverdueResolutions() {
         List<ResolutionResponse> resolutions = resolutionService.getOverdueResolutions();
         return ResponseEntity.ok(ApiResponse.success(resolutions));
     }
     
     @PatchMapping("/{id}/action-item/{itemId}/toggle")
+    @PreAuthorize("hasRole('SECTOR_OFFICIAL')")
     public ResponseEntity<ApiResponse<ResolutionResponse>> toggleActionItem(
             @PathVariable Long id,
             @PathVariable Long itemId) {
@@ -66,6 +71,7 @@ public class ResolutionController {
     }
     
     @PostMapping("/{id}/comments")
+    @PreAuthorize("hasAnyRole('SECTOR_OFFICIAL', 'ADMINISTRATOR')")
     public ResponseEntity<ApiResponse<ResolutionResponse>> addComment(
             @PathVariable Long id,
             @RequestParam String commentText) {
@@ -74,17 +80,18 @@ public class ResolutionController {
     }
     
     @PatchMapping("/{id}/conclude")
+    @PreAuthorize("hasRole('SECTOR_OFFICIAL')")
     public ResponseEntity<ApiResponse<ResolutionResponse>> concludeResolution(@PathVariable Long id) {
         ResolutionResponse resolution = resolutionService.concludeResolution(id);
         return ResponseEntity.ok(ApiResponse.success("Resolution concluded successfully", resolution));
     }
 
     @PostMapping("/{id}/action-items")
+    @PreAuthorize("hasRole('SECTOR_OFFICIAL')")
     public ResponseEntity<ApiResponse<ResolutionResponse>> addActionItem(
             @PathVariable Long id,
             @RequestParam String itemLabel,
             @RequestParam(required = false, defaultValue = "0") Integer displayOrder) {
-        // Implementation for adding action items if needed
         return ResponseEntity.ok(ApiResponse.success("Action item added", resolutionService.getResolutionById(id)));
     }
 }

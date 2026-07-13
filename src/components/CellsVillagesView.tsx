@@ -4,18 +4,14 @@
  */
 
 import React, { useState } from 'react';
-import { 
-  Building2, Users, MapPin, Search, ArrowRight, 
-  HelpCircle, Sparkles, LayoutGrid, CheckSquare 
-} from 'lucide-react';
-import { CivilCell, Village } from '../types';
+import { Building2, Users, Search } from 'lucide-react';
+import { CivilCell } from '../types';
 
 interface CellsVillagesViewProps {
   cells: CivilCell[];
-  onAddSimulatedVillage: (cellId: string) => void;
 }
 
-export const CellsVillagesView: React.FC<CellsVillagesViewProps> = ({ cells, onAddSimulatedVillage }) => {
+export const CellsVillagesView: React.FC<CellsVillagesViewProps> = ({ cells }) => {
   const [selectedCellId, setSelectedCellId] = useState<string>(cells[0]?.id || '');
   const [villageSearch, setVillageSearch] = useState('');
 
@@ -145,7 +141,6 @@ export const CellsVillagesView: React.FC<CellsVillagesViewProps> = ({ cells, onA
             </div>
 
             <div className="flex items-center gap-2 w-full sm:w-auto">
-              {/* Local Village search bar */}
               <div className="relative flex-1 sm:w-48">
                 <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
                   <Search className="w-3.5 h-3.5" />
@@ -158,15 +153,6 @@ export const CellsVillagesView: React.FC<CellsVillagesViewProps> = ({ cells, onA
                   className="w-full pl-8 pr-2 py-1 text-[11px] border border-slate-200 rounded-sm focus:outline-none focus:border-[#1a4231]"
                 />
               </div>
-
-              {/* Add simulated village key */}
-              <button
-                onClick={() => onAddSimulatedVillage(selectedCellId)}
-                className="py-1 px-2.5 bg-[#1a4231] text-white hover:bg-[#1a2d21] text-[10px] font-bold tracking-wider rounded-sm uppercase cursor-pointer"
-                title="Create a sample village to test system scaling"
-              >
-                Add Village
-              </button>
             </div>
           </div>
 

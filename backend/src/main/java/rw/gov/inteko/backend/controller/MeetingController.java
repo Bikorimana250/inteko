@@ -23,7 +23,7 @@ public class MeetingController {
     private final MeetingService meetingService;
     
     @PostMapping
-    @PreAuthorize("hasAnyRole('SECTOR_OFFICIAL', 'MEETING_SECRETARY')")
+    @PreAuthorize("hasRole('SECTOR_OFFICIAL')")
     public ResponseEntity<ApiResponse<MeetingResponse>> createMeeting(
             @Valid @RequestBody CreateMeetingRequest request) {
         MeetingResponse meeting = meetingService.createMeeting(request);
@@ -58,7 +58,7 @@ public class MeetingController {
     }
     
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAnyRole('SECTOR_OFFICIAL', 'MEETING_SECRETARY')")
+    @PreAuthorize("hasRole('SECTOR_OFFICIAL')")
     public ResponseEntity<ApiResponse<MeetingResponse>> updateMeetingStatus(
             @PathVariable Long id,
             @RequestParam MeetingStatus status) {

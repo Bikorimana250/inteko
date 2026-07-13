@@ -30,7 +30,26 @@ export const SectorOfficialDashboardView: React.FC<SectorOfficialDashboardViewPr
   onNavigateToView,
   onApproveQuickResolution
 }) => {
-  const [selectedCalendarDate, setSelectedCalendarDate] = useState<string>('Oct 24, 2023');
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<string>('');
+
+  // Build a dynamic calendar for the current month
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth(); // 0-indexed
+  const todayDay = now.getDate();
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const monthLabel = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+  // Collect meeting days from real data (meetingDate is "YYYY-MM-DD")
+  const meetingDays = new Set(
+    meetings
+      .map(m => {
+        const d = new Date(m.date);
+        if (d.getFullYear() === currentYear && d.getMonth() === currentMonth) return d.getDate();
+        return null;
+      })
+      .filter(Boolean) as number[]
+  );
 
   // Sector Official analytics calculations
   const totalMeetings = meetings.length;
@@ -291,22 +310,20 @@ export const SectorOfficialDashboardView: React.FC<SectorOfficialDashboardViewPr
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                 <CalendarRange className="w-4 h-4 text-emerald-800" /> Sector Assembly Agenda Calendar
               </h3>
-              <p className="text-[10px] text-slate-400">Active community schedule agenda logs</p>
+              <p className="text-[10px] text-slate-400">{monthLabel}</p>
             </div>
             <span className="text-[9px] bg-indigo-50 text-indigo-800 font-bold px-1.5 rounded-sm">Monthly overview</span>
           </div>
 
-          {/* Simple Clean Grid Representation of a Calendar */}
           <div className="grid grid-cols-7 gap-1.5 text-center text-xs text-slate-700 select-none">
             {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((dw, idx) => (
               <span key={idx} className="font-extrabold text-[#1a4231] text-[9px] uppercase">{dw}</span>
             ))}
-            {Array.from({ length: 28 }).map((_, idx) => {
+            {Array.from({ length: daysInMonth }).map((_, idx) => {
               const dayNum = idx + 1;
-              const dateStr = `Oct ${dayNum}, 2023`;
-              const isToday = dayNum === 24;
-              const hasMeeting = dayNum === 23 || dayNum === 24 || dayNum === 20;
-
+              const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+              const isToday = dayNum === todayDay;
+              const hasMeeting = meetingDays.has(dayNum);
               return (
                 <button
                   key={idx}
@@ -328,32 +345,26 @@ export const SectorOfficialDashboardView: React.FC<SectorOfficialDashboardViewPr
             })}
           </div>
 
-          {/* Calendar Selected Date Agenda Detail panel */}
           <div className="p-3 bg-slate-50 border border-slate-100 rounded-sm text-xs space-y-1.5 text-slate-700">
-            <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400">Agenda details for {selectedCalendarDate}</span>
-            {selectedCalendarDate === 'Oct 24, 2023' ? (
-              <div className="space-y-0.5">
-                <p className="font-bold text-[#1a4231] truncate">UMUGANDA PLANNING WORKSHOP (Planned: 1,500 Citizens)</p>
-                <div className="flex gap-2 text-[10px] text-slate-400 items-center font-mono">
-                  <span>09:00 AM CAT</span>
-                  <span>• Sector Hall A</span>
+            <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400">
+              {selectedCalendarDate ? `Agenda for ${selectedCalendarDate}` : 'Select a date'}
+            </span>
+            {selectedCalendarDate ? (() => {
+              const dayMeetings = meetings.filter(m => m.date === selectedCalendarDate);
+              if (dayMeetings.length === 0) {
+                return <p className="text-slate-400 font-light italic">No assemblies scheduled on this date.</p>;
+              }
+              return dayMeetings.map(m => (
+                <div key={m.id} className="space-y-0.5">
+                  <p className="font-bold text-[#1a4231] truncate">{m.title}</p>
+                  <div className="flex gap-2 text-[10px] text-slate-400 items-center font-mono">
+                    <span>{m.time}</span>
+                    <span>• {m.location}</span>
+                  </div>
                 </div>
-              </div>
-            ) : selectedCalendarDate === 'Oct 23, 2023' ? (
-              <div className="space-y-0.5">
-                <p className="font-bold text-slate-800 truncate">LOCAL INFRASTRUCTURE REVIEW (Ongoing)</p>
-                <div className="flex gap-2 text-[10px] text-slate-400 items-center font-mono">
-                  <span>Now Active</span>
-                  <span>• Gasabo District Hall</span>
-                </div>
-              </div>
-            ) : selectedCalendarDate === 'Oct 20, 2023' ? (
-              <div className="space-y-0.5">
-                <p className="font-bold text-slate-500 line-through truncate">EDUCATION REFORM CONSULTATION (Completed)</p>
-                <div className="text-[10px] text-[#1a4231] font-bold">420 Citizens attended registry.</div>
-              </div>
-            ) : (
-              <p className="text-slate-400 font-light italic">No public civil assembly sessions registered on this date.</p>
+              ));
+            })() : (
+              <p className="text-slate-400 font-light italic">Click a date to see scheduled assemblies.</p>
             )}
           </div>
 

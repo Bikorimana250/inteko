@@ -22,14 +22,20 @@ interface MeetingListViewProps {
   onMeetingCreated: (meeting: Meeting) => void;
   onUpdateMeetingStatus: (meetingId: string, status: 'Scheduled' | 'Ongoing' | 'Completed' | 'Postponed') => void;
   onCheckInAttendee: (meetingId: string, attendee: AttendeeEntry) => void;
+  userRole?: string;
+  onNavigateToView?: (view: string) => void;
 }
 
 export const MeetingListView: React.FC<MeetingListViewProps> = ({
   meetings,
   onMeetingCreated,
   onUpdateMeetingStatus,
-  onCheckInAttendee
+  onCheckInAttendee,
+  userRole,
+  onNavigateToView,
 }) => {
+  const isSectorOfficial = userRole === 'Sector Official';
+  const isSecretary = userRole === 'Meeting Secretary';
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [showScheduleForm, setShowScheduleForm] = useState(false);
@@ -89,18 +95,18 @@ export const MeetingListView: React.FC<MeetingListViewProps> = ({
       return;
     }
 
-    // Parse date string to ISO format YYYY-MM-DD
-    const parsedDate = new Date(date);
-    const isoDate = isNaN(parsedDate.getTime())
-      ? date // pass as-is if already in correct format
-      : parsedDate.toISOString().split('T')[0];
+    // Verify JWT is present before attempting the request
+    const token = localStorage.getItem('inteko_jwt_token');
+    if (!token) {
+      setErrorCode('Your session has expired. Please log out and log back in to create a meeting.');
+      return;
+    }
 
-    // Parse time to HH:MM:SS
-    const rawTime = time || '09:00';
-    const timeParts = rawTime.replace(/\s*(AM|PM|CAT).*/i, '').trim().split(':');
-    const isoTime = timeParts.length >= 2
-      ? `${timeParts[0].padStart(2, '0')}:${timeParts[1].padStart(2, '0')}:00`
-      : '09:00:00';
+    // type="date" always gives YYYY-MM-DD directly — no parsing needed
+    const isoDate = date;
+
+    // type="time" always gives HH:MM — append seconds for backend LocalTime
+    const isoTime = time ? `${time}:00` : '09:00:00';
 
     setSubmitting(true);
     setErrorCode('');
@@ -141,7 +147,11 @@ export const MeetingListView: React.FC<MeetingListViewProps> = ({
       setShowScheduleForm(false);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
-      setErrorCode(`Failed to save meeting: ${msg}`);
+      if (msg.includes('401') || msg.toLowerCase().includes('session expired')) {
+        setErrorCode('Session expired. Please log out and log back in, then try again.');
+      } else {
+        setErrorCode(`Failed to save meeting: ${msg}`);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -291,17 +301,19 @@ export const MeetingListView: React.FC<MeetingListViewProps> = ({
           <p className="text-[10px] text-slate-400 font-medium">Schedule, modify, and monitor active council assemblies.</p>
         </div>
 
-        <button
-          onClick={() => setShowScheduleForm(!showScheduleForm)}
-          className="py-1.5 px-3 bg-[#1a4231] text-white hover:bg-slate-800 text-[11px] font-bold rounded-sm tracking-wide uppercase cursor-pointer flex items-center gap-1 shadow-sm"
-        >
-          {showScheduleForm ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-          <span>{showScheduleForm ? 'Exit Schedule Forms' : 'Schedule Assembly'}</span>
-        </button>
+        {isSectorOfficial && (
+          <button
+            onClick={() => setShowScheduleForm(!showScheduleForm)}
+            className="py-1.5 px-3 bg-[#1a4231] text-white hover:bg-slate-800 text-[11px] font-bold rounded-sm tracking-wide uppercase cursor-pointer flex items-center gap-1 shadow-sm"
+          >
+            {showScheduleForm ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+            <span>{showScheduleForm ? 'Exit Schedule Forms' : 'Schedule Assembly'}</span>
+          </button>
+        )}
       </div>
 
       {/* 2. Schedule meeting slider form drawer */}
-      {showScheduleForm && (
+      {showScheduleForm && isSectorOfficial && (
         <div className="bg-white p-5 rounded-sm border border-[#1a423126] hover:shadow-md transition-all max-w-2xl mx-auto space-y-4">
           <div className="flex justify-between items-start pb-2 border-b border-slate-100">
             <div>
@@ -339,9 +351,8 @@ export const MeetingListView: React.FC<MeetingListViewProps> = ({
                 <div>
                   <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Target Date</label>
                   <input
-                    type="text"
+                    type="date"
                     required
-                    placeholder="e.g. Oct 28, 2023"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
                     className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-sm focus:outline-none focus:border-[#1a4231]"
@@ -351,8 +362,7 @@ export const MeetingListView: React.FC<MeetingListViewProps> = ({
                 <div>
                   <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Target Time</label>
                   <input
-                    type="text"
-                    placeholder="e.g. 09:00 AM CAT"
+                    type="time"
                     value={time}
                     onChange={(e) => setTime(e.target.value)}
                     className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-sm focus:outline-none focus:border-[#1a4231]"
@@ -548,6 +558,15 @@ export const MeetingListView: React.FC<MeetingListViewProps> = ({
                         >
                           <Check className="w-3 h-3" /> Check In
                         </button>
+                        {isSecretary && onNavigateToView && (
+                          <button
+                            onClick={() => onNavigateToView('Citizen Issues')}
+                            className="py-1 px-2 bg-white border border-amber-200 hover:bg-amber-50 text-amber-800 text-[10px] font-bold uppercase rounded-sm cursor-pointer transition-colors"
+                            title="Register a citizen issue raised during this meeting"
+                          >
+                            Log Issue
+                          </button>
+                        )}
                         <button
                           onClick={() => onUpdateMeetingStatus(meeting.id, 'Completed')}
                           className="py-1 px-2 bg-[#1a4231] text-white hover:bg-slate-800 text-[10px] font-bold uppercase rounded-sm cursor-pointer transition-colors"

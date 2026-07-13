@@ -76,12 +76,37 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/meetings/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/meetings/*/participants").permitAll()
                         
+                        // Meeting Management - Sector Official only
+                        .requestMatchers(HttpMethod.POST, "/meetings").hasRole("SECTOR_OFFICIAL")
+                        .requestMatchers(HttpMethod.PATCH, "/meetings/*/status").hasRole("SECTOR_OFFICIAL")
+                        
+                        // Issue Management
+                        .requestMatchers(HttpMethod.POST, "/issues").permitAll() // Citizens can report
+                        .requestMatchers(HttpMethod.GET, "/issues").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/issues/**").authenticated()
+                        .requestMatchers(HttpMethod.PATCH, "/issues/*/assign").hasRole("SECTOR_OFFICIAL")
+                        .requestMatchers(HttpMethod.PATCH, "/issues/*/resolve").hasRole("SECTOR_OFFICIAL")
+                        
+                        // Resolution Management
+                        .requestMatchers(HttpMethod.GET, "/resolutions").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/resolutions/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/resolutions").hasRole("SECTOR_OFFICIAL")
+                        .requestMatchers(HttpMethod.PATCH, "/resolutions/**").hasAnyRole("SECTOR_OFFICIAL", "MEETING_SECRETARY")
+                        
+                        // Documents
+                        .requestMatchers(HttpMethod.GET, "/documents").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/documents/**").authenticated()
+                        
+                        // Reports & Analytics - Officials and Admin only
+                        .requestMatchers(HttpMethod.GET, "/reports/**").hasAnyRole("ADMINISTRATOR", "SECTOR_OFFICIAL")
+                        .requestMatchers(HttpMethod.GET, "/analytics/**").hasAnyRole("ADMINISTRATOR", "SECTOR_OFFICIAL")
+                        
                         // Admin-only endpoints
                         .requestMatchers(HttpMethod.POST, "/users").hasRole("ADMINISTRATOR")
                         .requestMatchers(HttpMethod.PUT, "/users/**").hasRole("ADMINISTRATOR")
                         .requestMatchers(HttpMethod.DELETE, "/users/**").hasRole("ADMINISTRATOR")
                         
-                        // All authenticated users
+                        // All other authenticated requests
                         .anyRequest().authenticated()
                 );
         

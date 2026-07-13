@@ -20,7 +20,6 @@ import rw.gov.inteko.backend.security.JwtTokenProvider;
 import rw.gov.inteko.backend.security.UserPrincipal;
 
 import java.time.LocalDateTime;
-
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -48,13 +47,10 @@ public class AuthService {
         String accessToken = tokenProvider.generateToken(authentication);
         String refreshToken = tokenProvider.generateRefreshToken(authentication);
         
-        // Update last active timestamp
+        // Get user for response — skip lastActiveAt save to avoid auditing issues
         UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
         User user = userRepository.findById(userPrincipal.getId())
                 .orElseThrow(() -> new AuthenticationException("User not found"));
-        
-        user.setLastActiveAt(LocalDateTime.now());
-        userRepository.save(user);
         
         UserResponse userResponse = userMapper.toResponse(user);
         

@@ -10,8 +10,17 @@ function getAuthHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+// Called when any API response is 401 — clears stale session
+// Does NOT reload the page — lets React re-render naturally based on localStorage state
+function handleUnauthorized(): void {
+  localStorage.removeItem('inteko_jwt_token');
+  localStorage.removeItem('inteko_auth_state');
+  localStorage.removeItem('inteko_current_user');
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, { headers: getAuthHeaders() });
+  if (res.status === 401) { handleUnauthorized(); throw new Error('Session expired. Please log in again.'); }
   if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
   const json = await res.json();
   return json.data as T;
@@ -23,6 +32,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(body),
   });
+  if (res.status === 401) { handleUnauthorized(); throw new Error('Session expired. Please log in again.'); }
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
     throw new Error(`API error ${res.status}: ${errText || path}`);
@@ -31,7 +41,20 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return json.data as T;
 }
 
-// --- Attendance Summary ---
+async function patch<T>(path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (res.status === 401) { handleUnauthorized(); throw new Error('Session expired. Please log in again.'); }
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`API error ${res.status}: ${errText || path}`);
+  }
+  const json = await res.json();
+  return json.data as T;
+}
 
 export interface CellRankingItem {
   cellName: string;
@@ -101,6 +124,9 @@ export const fetchMeetings = (): Promise<MeetingApiResponse[]> =>
 export const createMeeting = (payload: CreateMeetingPayload): Promise<MeetingApiResponse> =>
   post<MeetingApiResponse>('/meetings', payload);
 
+export const updateMeetingStatus = (dbId: number, status: string): Promise<MeetingApiResponse> =>
+  patch<MeetingApiResponse>(`/meetings/${dbId}/status?status=${status}`);
+
 // --- Participant check-in ---
 
 export interface CheckInPayload {
@@ -117,3 +143,141 @@ export const checkInParticipant = async (meetingId: string | number, payload: Ch
   });
   if (!res.ok) throw new Error(`Check-in failed: ${res.status}`);
 };
+
+// --- Issues ---
+
+export interface IssueApiResponse {
+  id: number;
+  issueCode: string;
+  title: string;
+  category: string;   // e.g. "Infrastructure"
+  status: string;     // e.g. "Active", "Resolved", "Processing"
+  reporterName: string;
+  createdAt: string;
+}
+
+export const fetchIssues = (): Promise<IssueApiResponse[]> =>
+  get<IssueApiResponse[]>('/issues');
+
+// Create a new issue (POST /issues — public, no auth required per SecurityConfig)
+export interface CreateIssuePayload {
+  title: string;
+  description?: string;
+  category: string;
+  priority?: string;
+  reporterName: string;
+  reporterPhone?: string;
+  reporterIdNumber?: string;
+  sectorId?: number;
+}
+
+export const createIssue = (payload: CreateIssuePayload): Promise<IssueApiResponse> =>
+  post<IssueApiResponse>('/issues', payload);
+
+// Resolve an issue (PATCH /issues/{id}/resolve — SECTOR_OFFICIAL only)
+export const resolveIssue = (issueId: number): Promise<IssueApiResponse> =>
+  patch<IssueApiResponse>(`/issues/${issueId}/resolve`);
+
+// --- Resolutions ---
+
+export interface ResolutionActionItem {
+  id: number;
+  itemLabel: string;
+  isCompleted: boolean;
+  displayOrder: number;
+}
+
+export interface ResolutionComment {
+  id: number;
+  commentText: string;
+  authorName: string;
+  createdAt: string;
+}
+
+export interface ResolutionApiResponse {
+  id: number;
+  resolutionCode: string;
+  title: string;
+  summary: string;
+  assignedUnit: string;
+  responsibleOfficer: string;
+  status: string;         // "Active" | "Concluded"
+  progressPercentage: number;
+  dueDate: string;
+  createdAt: string;
+  actionItems: ResolutionActionItem[];
+  comments: ResolutionComment[];
+}
+
+export const fetchResolutions = (): Promise<ResolutionApiResponse[]> =>
+  get<ResolutionApiResponse[]>('/resolutions');
+
+// --- Notifications ---
+
+export interface NotificationApiResponse {
+  id: number;
+  title: string;
+  message: string;
+  category: string;   // "Meeting" | "Issue" | "Resolution" | "System"
+  isRead: boolean;
+  actionLabel?: string;
+  createdAt: string;
+}
+
+export const fetchNotifications = (): Promise<NotificationApiResponse[]> =>
+  get<NotificationApiResponse[]>('/notifications');
+
+// --- Resolution actions ---
+
+export const concludeResolution = (dbId: number): Promise<void> =>
+  patch<void>(`/resolutions/${dbId}/conclude`);
+
+export const toggleResolutionActionItem = (resolutionDbId: number, itemDbId: number): Promise<void> =>
+  patch<void>(`/resolutions/${resolutionDbId}/action-item/${itemDbId}/toggle`);
+
+export const addResolutionComment = (resolutionDbId: number, commentText: string): Promise<void> =>
+  post<void>(`/resolutions/${resolutionDbId}/comments?commentText=${encodeURIComponent(commentText)}`, null);
+
+// --- Documents ---
+
+export interface DocumentApiResponse {
+  id: number;
+  documentCode: string;
+  title: string;
+  description: string;
+  category: string;
+  fileSize: number;
+  fileName: string;
+  createdAt: string;
+}
+
+export const fetchDocuments = (): Promise<DocumentApiResponse[]> =>
+  get<DocumentApiResponse[]>('/documents');
+
+// --- Users ---
+
+export interface CreateUserPayload {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  idNumber: string;
+  phone: string;
+  position: string;
+  role: string;       // "ADMINISTRATOR" | "SECTOR_OFFICIAL" | "MEETING_SECRETARY"
+  permissions: string;
+  sectorId?: number;
+}
+
+export interface UserApiResponse {
+  id: number;
+  userCode: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  status: string;
+}
+
+export const createUser = (payload: CreateUserPayload): Promise<UserApiResponse> =>
+  post<UserApiResponse>('/users', payload);
