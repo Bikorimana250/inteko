@@ -164,7 +164,7 @@ export interface CreateIssuePayload {
   title: string;
   description?: string;
   category: string;
-  priority?: string;
+  priority: string;
   reporterName: string;
   reporterPhone?: string;
   reporterIdNumber?: string;
@@ -175,8 +175,8 @@ export const createIssue = (payload: CreateIssuePayload): Promise<IssueApiRespon
   post<IssueApiResponse>('/issues', payload);
 
 // Resolve an issue (PATCH /issues/{id}/resolve — SECTOR_OFFICIAL only)
-export const resolveIssue = (issueId: number): Promise<IssueApiResponse> =>
-  patch<IssueApiResponse>(`/issues/${issueId}/resolve`);
+export const resolveIssue = (issueId: number, resolutionSummary: string): Promise<IssueApiResponse> =>
+  patch<IssueApiResponse>(`/issues/${issueId}/resolve?resolutionSummary=${encodeURIComponent(resolutionSummary)}`);
 
 // --- Resolutions ---
 

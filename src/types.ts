@@ -63,6 +63,7 @@ export interface SystemNotification {
 
 export interface CitizenIssue {
   id: string;
+  dbId?: number; // numeric DB primary key, populated when loaded from backend
   title: string;
   category: 'Infrastructure' | 'Governance' | 'Social' | 'Economic' | 'Land';
   status: 'Active' | 'Resolved' | 'Processing' | 'Success';

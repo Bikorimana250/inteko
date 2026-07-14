@@ -212,22 +212,33 @@ export default function App() {
       });
   }, []);
 
+  // Maps backend uppercase IssueStatus enum to frontend title-case values
+  const mapIssueStatus = (status: string): CitizenIssue['status'] => {
+    const statusMap: Record<string, CitizenIssue['status']> = {
+      ACTIVE: 'Active', PROCESSING: 'Processing', RESOLVED: 'Resolved',
+      CLOSED: 'Resolved', REJECTED: 'Resolved',
+      // passthrough for already-mapped values
+      Active: 'Active', Processing: 'Processing', Resolved: 'Resolved', Success: 'Success',
+    };
+    return statusMap[status] ?? 'Active';
+  };
+
+  const mapBackendIssues = (backendIssues: any[]): CitizenIssue[] =>
+    backendIssues.map((i) => ({
+      id: i.issueCode ?? String(i.id),
+      dbId: i.id,
+      title: i.title,
+      category: (i.category as CitizenIssue['category']) ?? 'Infrastructure',
+      status: mapIssueStatus(String(i.status)),
+      reporter: i.reporterName ?? 'Unknown',
+      time: i.createdAt ? new Date(i.createdAt).toLocaleDateString() : 'Unknown',
+    }));
+
   // Load issues from backend when authenticated
   useEffect(() => {
     if (!isAuthenticated) return;
     fetchIssues()
-      .then((backendIssues) => {
-        const mapped: CitizenIssue[] = backendIssues.map((i) => ({
-          id: i.issueCode ?? String(i.id),
-          title: i.title,
-          category: (i.category as CitizenIssue['category']) ?? 'Infrastructure',
-          status: (['Active','Resolved','Processing','Success'].includes(i.status)
-            ? i.status : 'Active') as CitizenIssue['status'],
-          reporter: i.reporterName ?? 'Unknown',
-          time: i.createdAt ? new Date(i.createdAt).toLocaleDateString() : 'Unknown',
-        }));
-        setIssues(mapped);
-      })
+      .then((backendIssues) => setIssues(mapBackendIssues(backendIssues)))
       .catch(() => { /* keep existing data */ });
   }, [isAuthenticated]);
 
@@ -467,6 +478,14 @@ export default function App() {
 
   // Create a real issue via backend (POST /issues — public endpoint)
   const handleCreateIssue = (issueData: { title: string; description: string; category: string; reporterName: string; reporterPhone: string; }) => {
+    const categoryEnumMap: Record<string, string> = {
+      'Infrastructure': 'INFRASTRUCTURE',
+      'Land': 'LAND',
+      'Governance': 'GOVERNANCE',
+      'Social': 'SOCIAL',
+      'Economic': 'ECONOMIC',
+    };
+
     // Optimistic local add
     const tempIssue: CitizenIssue = {
       id: `I-${Date.now().toString().slice(-4)}`,
@@ -478,12 +497,17 @@ export default function App() {
     };
     setIssues(prev => [tempIssue, ...prev]);
 
+    // Sanitize phone: backend requires +250XXXXXXXXX format or omit entirely
+    const phoneRaw = issueData.reporterPhone?.trim() ?? '';
+    const phoneValid = /^\+250[\s]?\d{3}[\s]?\d{3}[\s]?\d{3}$/.test(phoneRaw);
+
     createIssue({
       title: issueData.title,
       description: issueData.description,
-      category: issueData.category,
+      category: categoryEnumMap[issueData.category] ?? issueData.category.toUpperCase(),
+      priority: 'MEDIUM',
       reporterName: issueData.reporterName,
-      reporterPhone: issueData.reporterPhone,
+      reporterPhone: phoneValid ? phoneRaw : undefined,
     }).then((created) => {
       // Replace temp with real backend record
       setIssues(prev => prev.map(i =>
@@ -502,12 +526,17 @@ export default function App() {
     // Optimistic local update
     setIssues(prev => prev.map(i => i.id === issueId ? { ...i, status: 'Resolved' as CitizenIssue['status'] } : i));
 
-    // Find numeric DB id — issues loaded from backend have numeric string ids or issueCode
-    // Try to derive a numeric id; if not available, backend call will fail gracefully
-    const numericId = parseInt(issueId.replace(/\D/g, ''), 10);
-    if (!isNaN(numericId) && numericId > 0) {
-      resolveIssue(numericId)
-        .then(() => showToast('Issue marked as resolved.'))
+    const issue = issues.find(i => i.id === issueId);
+    const dbId = issue?.dbId;
+    if (dbId) {
+      resolveIssue(dbId, 'Resolved via administrative portal')
+        .then(() => {
+          // Re-fetch from backend to get the authoritative status
+          fetchIssues()
+            .then((backendIssues) => setIssues(mapBackendIssues(backendIssues)))
+            .catch(() => {});
+          showToast('Issue marked as resolved.');
+        })
         .catch(() => showToast('Issue resolved locally. Backend sync failed.', 'error'));
     } else {
       showToast('Issue resolved locally. Backend ID unavailable — refresh after backend sync.');
@@ -652,7 +681,8 @@ export default function App() {
             ] 
           },
           { group: 'Reference Information', items: [
-              { view: 'Citizen Issues', label: 'View Issues (Read-Only)', icon: AlertTriangle },
+              { view: 'Citizen Issues', label: 'View Issues ', icon: AlertTriangle },
+              { view: 'Resolutions', label: 'Resolution Tracking', icon: FileText },
               { view: 'Documents', label: 'Meeting Documents', icon: FileText },
               { view: 'Notifications', label: 'My Notifications', icon: Bell }
             ] 

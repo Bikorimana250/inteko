@@ -92,10 +92,10 @@ export const EditIssueView: React.FC<EditIssueViewProps> = ({
         </div>
 
         {/* Form Fields Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           
           {/* Issue Subject */}
-          <div className="space-y-1.5 md:col-span-2">
+          <div className="space-y-1.5 sm:col-span-2">
             <label className="block text-[10px] font-bold tracking-wider text-slate-500 uppercase">
               Issue Subject Title
             </label>
@@ -203,7 +203,7 @@ export const EditIssueView: React.FC<EditIssueViewProps> = ({
           </div>
 
           {/* Detailed Description */}
-          <div className="space-y-1.5 md:col-span-2">
+          <div className="space-y-1.5 sm:col-span-2">
             <label className="block text-[10px] font-bold tracking-wider text-slate-500 uppercase">
               Detailed Case Description & Meeting Context
             </label>
@@ -218,7 +218,7 @@ export const EditIssueView: React.FC<EditIssueViewProps> = ({
           </div>
 
           {/* File attachment / Supporting documents */}
-          <div className="col-span-12">
+          <div className="sm:col-span-2">
             <div className="border border-dashed border-slate-200 rounded-sm p-4 text-center hover:bg-slate-50 transition-colors">
               <Upload className="w-6 h-6 text-slate-450 mx-auto mb-1.5" />
               <p className="text-xs font-bold text-slate-700">Attach supporting local evidence files</p>
