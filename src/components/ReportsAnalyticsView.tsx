@@ -86,7 +86,7 @@ export const ReportsAnalyticsView: React.FC<ReportsAnalyticsViewProps> = ({
         <title>INTEKO Executive Report ${year}</title>
         <style>
           body { font-family: Arial, sans-serif; padding: 40px; color: #1e293b; }
-          h1 { color: #1a4231; border-bottom: 3px solid #1a4231; padding-bottom: 8px; }
+          h1 { color: #1a4231; }
           h2 { color: #1a4231; margin-top: 30px; font-size: 14px; text-transform: uppercase; }
           table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
           th { background: #1a4231; color: white; padding: 8px; text-align: left; }
@@ -97,7 +97,13 @@ export const ReportsAnalyticsView: React.FC<ReportsAnalyticsViewProps> = ({
           .kpi-label { font-size: 11px; color: #64748b; }
           .footer { margin-top: 40px; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px; }
         </style></head><body>
-        <h1>Inteko y'Abaturage — National Performance Report</h1>
+        <div style="display:flex;align-items:center;border-bottom:3px solid #1a4231;padding-bottom:12px;margin-bottom:16px;">
+          <img src="/my logo.svg" alt="Logo" style="height:56px;width:auto;margin-right:20px;" />
+          <div style="flex:1;text-align:center;">
+            <h1 style="margin:0;color:#1a4231;font-size:20px;">Inteko y'Abaturage</h1>
+            <p style="margin:2px 0 0;color:#64748b;font-size:12px;">National Performance Report</p>
+          </div>
+        </div>
         <p style="color:#64748b;font-size:12px">Period: ${quarter} ${year} &nbsp;|&nbsp; Generated: ${new Date().toLocaleString()} &nbsp;|&nbsp; By: ${currentUser.name || 'System'}</p>
         
         <h2>Key Performance Indicators</h2>
